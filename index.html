@@ -185,7 +185,7 @@
     }
     /* A dark card differs from the page by 1.24, so once the shadow is gone
        the border is the only thing left holding the edge. */
-    .card,.list-card,.blk,.tile,.goalbox,.sheet{ border:1px solid var(--label-3); }
+    .card,.list-card,.blk,.tiles,.goalbox,.sheet{ border:1px solid var(--label-3); }
   }
   @media (prefers-contrast: more){
     :root{ --label:#000000; --label-2:#2b343c; --label-3:#4a545e; --on-fill:#2b343c; }
@@ -399,6 +399,10 @@
         font-size:var(--fs-body);font-weight:600;border-radius:var(--r-card);}
   @media (prefers-color-scheme: dark){
     button.primary{border-color:var(--accent-line);}
+    /* The same problem the primary button already had, missed on this one:
+       --good-fill is 2.42 against the dark card and the border is declared as the
+       same colour, so Add in the Library had almost no edge. */
+    button.good{border-color:var(--good-line);}
   }
   /* Only where a real pointer exists, because on iOS a bare :hover sticks to
      the last thing you touched and reads as a control that never let go. */
@@ -449,7 +453,11 @@
   /* A white pill on a light track is a 1.15 state indicator, which is not a
      state indicator. The chosen cell takes the accent fill at 7.56. */
   .seg button.primary{background:var(--accent-fill);color:var(--on-accent);box-shadow:none;}
-  .seg button:active{background:var(--fill-1);transform:none;}
+    /* Dim, never replace. This used to drop the accent fill while leaving the
+     label white, so pressing the rating already chosen went white on a pale
+     grey. Both selectors are 0,2,1, so source order alone decided it. */
+  .seg button:not(.primary):active{background:var(--fill-1);transform:none;}
+  .seg button.primary:active{filter:brightness(1.35);}
 
   /* iOS switch. White knob on --good-fill is 7.02, so the state reads without
      colour vision: the knob moves as well as the track filling. */
@@ -528,6 +536,10 @@
     content:"";position:absolute;left:var(--s-4);right:0;top:0;height:1px;
     background:var(--sep);transform:scaleY(.5);transform-origin:top;
   }
+  /* A suggested set and its own Add and No pair are two sibling rows, so the
+     hairline was drawn between a set and its own buttons exactly as it is drawn
+     between two different sets, and the buttons read as belonging to nothing. */
+  .irow.pact::before{display:none;}
   .irow:active{transform:none;}
   .irow.tap{cursor:pointer;touch-action:manipulation;}
   .irow.tap:active{background:var(--fill-3);}
@@ -799,7 +811,7 @@
   #pool .prole{font-size:var(--p-role);font-weight:700;text-transform:uppercase;
         letter-spacing:.08em;}
   #pool .pcall{font-size:var(--p-call);line-height:1.15;font-weight:700;
-        letter-spacing:.01em;margin-top:6px;hyphens:none;overflow-wrap:break-word;}
+        letter-spacing:.01em;margin-top:6px;-webkit-hyphens:none;hyphens:none;overflow-wrap:break-word;}
   #pool .prest{font-size:var(--p-rest);font-weight:700;line-height:1.3;margin-top:8px;
         font-variant-numeric:tabular-nums;}
   #pool .pqual{font-size:var(--p-qual);font-weight:600;line-height:1.35;margin-top:8px;}
@@ -843,9 +855,11 @@
     display:flex;align-items:center;justify-content:center;
     font-size:52px;font-weight:700;line-height:1;
   }
-  /* The strip was an empty box, which tells nobody it is the thing to tap.
-     Drawn in CSS so the engine keeps writing no markup for it. */
-  #pool .ptick::after{content:"\2713";}
+  /* The strip was an empty box, which tells nobody it is the thing to tap. A ring
+     before, a tick after, so done and not-done differ by shape as well as by the
+     fill inverting. Drawn in CSS, so the engine still writes no markup for it. */
+  #pool .ptick::after{content:"\25CB";}
+  #pool .ptick.on::after{content:"\2713";}
   #pool .ptick.on{background:var(--p-ink);color:var(--p-paper);}
   #pool .ptick:active{background:var(--p-ink);color:var(--p-paper);transform:none;}
   #pool button{min-height:var(--pool-target-sm);font-size:var(--p-btn);font-weight:700;
@@ -885,27 +899,27 @@
 <!-- The tab bar, the top bar, the scrim and the sheet frame are static markup,
      not built by the engine. The icons have to be inline SVG and h() cannot
      build SVG: document.createElement("svg") gives an HTMLUnknownElement. -->
-<nav class="tabbar glass" id="tabbar" role="tablist">
-  <button class="tab" id="tab-today" role="tab" aria-label="Today">
+<nav class="tabbar glass" id="tabbar" aria-label="Main">
+  <button class="tab" id="tab-today" aria-label="Today">
     <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="6.5" width="20" height="17.5" rx="4"/><path d="M4 12h20M9.5 3.5v4M18.5 3.5v4"/></svg>
     <span class="lbl">Today</span>
   </button>
-  <button class="tab" id="tab-history" role="tab" aria-label="History">
+  <button class="tab" id="tab-history" aria-label="History">
     <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M14 8v6l4.5 2.5"/><path d="M4.5 14a9.5 9.5 0 1 0 3-6.9"/><path d="M4 4.5v3.6h3.6"/></svg>
     <span class="lbl">History</span>
   </button>
-  <button class="tab" id="tab-library" role="tab" aria-label="Library">
+  <button class="tab" id="tab-library" aria-label="Library">
     <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4.5" width="20" height="6" rx="2"/><rect x="4" y="12.5" width="20" height="6" rx="2"/><path d="M6.5 21.5h15"/></svg>
     <span class="lbl">Library</span>
   </button>
-  <button class="tab" id="tab-insights" role="tab" aria-label="Insights">
+  <button class="tab" id="tab-insights" aria-label="Insights">
     <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4.5 23.5h19"/><path d="M8 23.5V13M14 23.5V6.5M20 23.5v-6"/></svg>
     <span class="lbl">Insights</span>
   </button>
 </nav>
 
 <div class="scrim" id="scrim"></div>
-<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Options">
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Options" aria-hidden="true">
   <div class="grabber"></div>
   <div class="sheet-head" id="sheet-head"></div>
   <div class="sheet-body" id="sheet-body"></div>
@@ -1074,11 +1088,18 @@
     SHEET.setAttribute("aria-label", title || "Options");
     build(SHEETBODY);
     SHEET.className = size === "sm" ? "sheet sm on" : "sheet med on";
+    SHEET.setAttribute("aria-hidden", "false");
     SCRIM.className = "scrim on";
   }
   function closeSheet(){
     SHEET.className = "sheet";
     SCRIM.className = "scrim";
+    // The sheet never leaves the DOM, so without this a closed one still says it
+    // is a modal dialog and still holds the last sheet's contents: close Retire
+    // and a screen reader can still walk "Retire this set" and its buttons.
+    SHEET.setAttribute("aria-hidden", "true");
+    clear(SHEETBODY);
+    SHEETHEAD.textContent = "";
   }
   SCRIM.addEventListener("click", closeSheet);
 
@@ -2601,8 +2622,12 @@
       acts.push(irow({ title:"Did not run", act:true, onclick:function(){ markStatus(sk, "skipped"); } }));
     }
     // The already-saved alert has promised this control since day one and it did
-    // not exist: replace:true was produced nowhere in the file.
-    acts.push(irow({ title:"Regenerate", act:true, onclick:function(){ askRegenerate(sk); } }));
+    // not exist: replace:true was produced nowhere in the file. Only for a saved
+    // session, because on an unsaved draft the button above already says
+    // "Generate another" and does the same thing, and Regenerate's own sheet
+    // talks about sets going back into the rotation, which has not happened yet.
+    if (sk.saved)
+      acts.push(irow({ title:"Regenerate", act:true, onclick:function(){ askRegenerate(sk); } }));
     acts.push(irow({ title:"Copy as text", act:true, onclick:function(){ copyText(asPlainText(sk)); } }));
     acts.push(irow({ title:"Print", act:true, onclick:function(){ window.print(); } }));
     APP.append(list(null, h("div",{class:"list-card"}, acts),
@@ -2842,7 +2867,12 @@
 
     pool.append(h("div",{class:"pgoal"}, sk.goal));
 
-    deck.forEach(function(b, idx){ pool.append(poolBlock(b, idx, idx === open, sk)); });
+    var openEl = null;
+    deck.forEach(function(b, idx){
+      var el = poolBlock(b, idx, idx === open, sk);
+      if (idx === open) openEl = el;
+      pool.append(el);
+    });
 
     // 48px apart. Mark done used to sit 10px from Copy, which is inside one
     // sigma of a wet finger, and only one of the two changes anything.
@@ -2852,12 +2882,15 @@
 
     pool.addEventListener("scroll", function(){ lastScrollAt = Date.now(); });
     document.body.append(pool);
-    // Bring the open block up under the sticky clock without measuring anything:
-    // there is no getBoundingClientRect here, and every collapsed row is one
-    // known height, so the offset is arithmetic. This also puts the deck back
-    // where it was after a background refresh repaints it. It has to come after
+    // Bring the open block up under the sticky clock. This used to multiply the
+    // index by a guessed row height of 88, but a collapsed row measured 90.1 with
+    // a 12px margin, so the real pitch is 102.1 and the deck landed 56px out by
+    // the fifth block. offsetTop is the number itself and it cannot drift when
+    // the type or padding changes. It reads undefined behind the test stub, and
+    // the guard turns that into no scroll rather than NaN. It has to come after
     // the append, because a detached box cannot scroll.
-    pool.scrollTop = open * 88;
+    var openTop = openEl ? openEl.offsetTop : null;
+    pool.scrollTop = typeof openTop === "number" ? Math.max(0, openTop - 8) : 0;
   }
   function poolBlock(b, idx, open, sk){
     var s = splitCall(b.rendered_text);
@@ -3105,7 +3138,10 @@
   function askClaude(prefRole){
     var thin = thinRoles();
     var roleSel = h("select",{"aria-label":"Role"},
-      Object.keys(ROLE_LABEL).filter(function(r){ return r !== "warmup"; })
+      // Warm-up has no prescribed sets, and games come from tr_games, not from
+      // the library: pickForRole is never called with "game", so a game-role set
+      // added here would sit in tr_exercises and never be chosen.
+      Object.keys(ROLE_LABEL).filter(function(r){ return r !== "warmup" && r !== "game"; })
         .map(function(r){ return h("option",{value:r}, ROLE_LABEL[r]); }));
     roleSel.value = prefRole || (thin.length ? thin[0].role : "main_set");
     var focusSel = h("select",{"aria-label":"Focus"},
