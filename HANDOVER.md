@@ -13,21 +13,44 @@ colour in the shipped app. Change it to `var(--accent-text)`. It was left unfixe
 on purpose, because a workflow was mid-flight anchoring edits to the current bytes.
 Fix it first, then bump `sw.js` and push.
 
-**Pass 2 was started and did not finish.** The workflow ran the four re-baseline
-agents; three completed and their output is saved. The Repair, Re-review and
-Completeness phases never ran. Workflow runs cannot be resumed across sessions, so
-do not try: re-run the repair using these three documents as the input.
+**Pass 2 was started and did not finish.** All four re-baseline agents completed
+and their output is saved. The repair agent then died on a network error
+(ENOTFOUND) and produced nothing, so the Repair, Re-review and Completeness phases
+never ran. Workflow runs cannot be resumed across sessions, so do not try. Re-run
+the repair using these four documents as the input, and do not start the design
+work over: everything needed to write the merged stylesheet and the corrected edit
+list is already in them.
 
-- `design/pass2-README.md` is the index.
-- `design/pass2-triage-47-findings.md` triages every review finding against the
-  post-pass-1 file. **This supersedes `DESIGN-REVIEW.md` where they disagree.**
-- `design/pass2-rebaseline-markup-edits.md` re-anchors the 24 draft edits. 17 still
-  apply, 3 are superseded, 2 partly, 2 need restructuring.
-- `design/pass2-rebaseline-stylesheet-merge.md` reconciles the draft CSS against
-  the live one. 41 of 44 token names already match with identical values.
-- The harness extension agent did not finish. That work has to be redone, and it
-  is the prerequisite for pass 2: `verify.js` still cannot fail when the interface
-  breaks, and `renderPool` is not reachable from `WSTRAIN_ENGINE` at all.
+- `design/pass2-README.md` is the index. Read the four in the order it gives.
+- `design/pass2-triage-47-findings.md` (59 items) triages every review finding
+  against the post-pass-1 file. **This supersedes `DESIGN-REVIEW.md` wherever the
+  two disagree.** It also records 9 review findings that are already live defects,
+  plus 5 live defects and 3 hazards the review never contained, as N1 to N8.
+- `design/pass2-stylesheet-merge-plan.md` (37 items) reconciles the draft CSS
+  against the live one. 41 of the 44 token names already match with identical
+  values, so this is a merge, not a rewrite.
+- `design/pass2-markup-edits-rebaselined.md` (27 items) re-anchors the 24 draft
+  edits against the current bytes. 17 still apply, 3 are superseded, 2 partly, 2
+  need restructuring.
+- `design/pass2-harness-extension.md` (10 items) is the plan for making `verify.js`
+  able to fail when the interface breaks, and for reaching `renderPool` from
+  `WSTRAIN_ENGINE`. That is the prerequisite for the rest.
+
+### Three traps recorded in those documents
+
+Worth knowing before touching anything, because each one makes things worse:
+
+1. **Never paste `design/draft-stylesheet.css` over the live one.** It re-bundles
+   the accessibility media queries and hardcodes light-mode label hexes, which puts
+   `#000000` text on `#1c1c1e` cards at 1.23:1 in dark mode. It also drops
+   `button.small{min-width:64px}`, and the five difficulty buttons are single
+   characters with that class, so they fall to about 32px wide.
+2. **The draft edits call `isActive()`. The live helper is `isLive`**
+   (`index.html:691`, used in 9 places). Any snippet lifted from the draft throws
+   `ReferenceError` until it is renamed.
+3. **Do not apply review major 10's `--on-good:#0d2f1c`.** Against the
+   `--good-fill:#14663a` that actually shipped it computes to 2.08:1. The live
+   split-token approach measures 7.02:1 and is already correct.
 
 **Four traps, all of which make things worse if applied blind:**
 
