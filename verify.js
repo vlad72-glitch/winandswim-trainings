@@ -169,25 +169,151 @@ check(thinFocus.length === 0, "every focus has at least two sets",
       "focuses with fewer than two sets: " + thinFocus.map(f => f.key).join(", "));
 
 // ---------------------------------------------------------------------------
-// 2. Load the engine out of index.html behind a minimal DOM stub
+// 2. Load the engine out of index.html behind a DOM stub
+//
+// The stub stays small, but four things in it had to become real, because a stub
+// that lies about the DOM is a harness that cannot see the interface at all.
+//
+//  1. firstChild and removeChild really detach. clear() is a
+//     "while (node.firstChild) node.removeChild(node.firstChild)" loop, so with
+//     the old no-op pair clear() did nothing: every view drew on top of the last
+//     one, and a check for "the history list is on screen" would have passed on
+//     leftovers from the session card.
+//  2. textContent reads back the text of the whole subtree, so a check can read
+//     what the coach reads. The app also writes it directly (the pool clock).
+//  3. One id, one node. getElementById walks the document and returns that node,
+//     or null. The old stub minted a fresh object per call, so
+//     getElementById("app") !== getElementById("app"), getElementById("pool")
+//     was never null, the pool overlay was therefore never really removed, and a
+//     second overlay stacked on the first (a dead black screen on the deck) could
+//     not be seen. A renamed id in the markup was invisible for the same reason:
+//     the app asked for "app" and always got something back.
+//  4. The document is parsed out of index.html's own <body> instead of being
+//     hand written here, so the ids and classes the harness checks are the ones
+//     that actually ship.
+//
+// Everything else is still a no-op, and the engine still may not use classList,
+// innerHTML, dataset, closest, matches or getBoundingClientRect.
 // ---------------------------------------------------------------------------
-function fakeEl(){
+function textOf(n){
+  if (!n) return "";
+  if (n.nodeType === 3) return n.textContent == null ? "" : String(n.textContent);
+  const kids = n.children || [];
+  let s = "";
+  for (let i = 0; i < kids.length; i++) s += textOf(kids[i]);
+  return s;
+}
+function walk(n, fn){
+  if (!n || n.nodeType !== 1) return;
+  fn(n);
+  const kids = n.children || [];
+  for (let i = 0; i < kids.length; i++) walk(kids[i], fn);
+}
+function findAll(root, pred){ const out = []; walk(root, e => { if (pred(e)) out.push(e); }); return out; }
+function countEls(root){ let c = 0; walk(root, () => c++); return c; }
+function classesOf(el){ return String(el.className || "").split(/\s+/).filter(Boolean); }
+function byClass(root, cls){ return findAll(root, e => classesOf(e).indexOf(cls) !== -1); }
+function byTag(root, tag){ const T = tag.toUpperCase(); return findAll(root, e => e.tagName === T); }
+function label(el){ return textOf(el).replace(/\s+/g, " ").trim(); }
+// Buttons are wired with onclick through h(), which becomes addEventListener,
+// so the stub records listeners and the harness can press things.
+function fire(el, type){
+  const ls = (el && el.listeners && el.listeners[type]) || [];
+  ls.slice().forEach(fn => fn.call(el, { type, target: el, preventDefault(){}, stopPropagation(){} }));
+  return ls.length;
+}
+function textNode(t){ return { nodeType: 3, textContent: String(t), parentNode: null }; }
+
+function fakeEl(tag){
   const el = {
-    className: "", style: {}, textContent: "", value: "", children: [], firstChild: null,
-    append(){ for (const a of arguments) el.children.push(a); },
-    appendChild(c){ el.children.push(c); return c; },
-    removeChild(){ return null; },
-    addEventListener(){}, removeEventListener(){}, setAttribute(){}, getAttribute(){ return null; },
-    remove(){}, select(){}, focus(){}, contains(){ return false; },
-    querySelector(){ return null; }, querySelectorAll(){ return []; },
-    nodeType: 1
+    tagName: String(tag || "div").toUpperCase(),
+    nodeType: 1, className: "", value: "", style: {},
+    children: [], parentNode: null, attrs: {}, listeners: {}
   };
+  function adopt(c){
+    if (c == null || c === false) return c;
+    if (c.parentNode && c.parentNode.removeChild) c.parentNode.removeChild(c);
+    c.parentNode = el; el.children.push(c); return c;
+  }
+  el.append = function(){ for (const a of arguments) adopt(a); };
+  el.appendChild = c => adopt(c);
+  el.removeChild = function(c){
+    const i = el.children.indexOf(c);
+    if (i === -1) return null;
+    el.children.splice(i, 1);
+    if (c) c.parentNode = null;
+    return c;
+  };
+  el.remove = function(){ if (el.parentNode) el.parentNode.removeChild(el); };
+  el.addEventListener = function(t, fn){
+    if (typeof fn === "function") (el.listeners[t] = el.listeners[t] || []).push(fn);
+  };
+  el.removeEventListener = function(t, fn){
+    const a = el.listeners[t] || [], i = a.indexOf(fn);
+    if (i !== -1) a.splice(i, 1);
+  };
+  // A browser mirrors these three onto properties, and h() routes id, class and
+  // value through setAttribute, so the stub has to mirror them too.
+  el.setAttribute = function(k, v){
+    v = String(v); el.attrs[k] = v;
+    if (k === "id") el.id = v;
+    else if (k === "class") el.className = v;
+    else if (k === "value") el.value = v;
+  };
+  el.getAttribute = k => (Object.prototype.hasOwnProperty.call(el.attrs, k) ? el.attrs[k] : null);
+  el.contains = function(n){ let hit = el === n; walk(el, e => { if (e === n) hit = true; }); return hit; };
+  el.select = function(){}; el.focus = function(){};
+  el.querySelector = () => null; el.querySelectorAll = () => [];
+  Object.defineProperty(el, "firstChild", { get: () => el.children[0] || null });
+  Object.defineProperty(el, "textContent", {
+    get: () => textOf(el),
+    set(v){ while (el.children.length) el.removeChild(el.children[0]); adopt(textNode(v)); }
+  });
   return el;
 }
+
 const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 const appScript = scripts.find(s => s.includes("WSTRAIN_ENGINE"));
 if (!appScript){ console.log(BAD + " could not find the app script in index.html"); process.exit(1); }
+
+// Enough of a parser to rebuild the page the app boots into. index.html's body
+// is six elements and a heading, so this only needs tags, ids and classes.
+const VOID_TAGS = { br:1, hr:1, img:1, input:1, meta:1, link:1, source:1, area:1,
+                    base:1, col:1, embed:1, param:1, track:1, wbr:1 };
+function unescapeHtml(s){
+  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ");
+}
+function parseBody(src){
+  const root = fakeEl("html"), body = fakeEl("body");
+  root.appendChild(body);
+  const m = src.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  if (!m) return { root, body };
+  const s = m[1].replace(/<!--[\s\S]*?-->/g, "").replace(/<script\b[\s\S]*?<\/script>/gi, "");
+  const stack = [body];
+  const re = /<(\/?)([a-zA-Z][-\w]*)((?:"[^"]*"|'[^']*'|[^>])*)>|([^<]+)/g;
+  let t;
+  while ((t = re.exec(s)) !== null){
+    if (t[4] != null){
+      const text = unescapeHtml(t[4]).replace(/\s+/g, " ");
+      if (text.trim()) stack[stack.length - 1].appendChild(textNode(text));
+      continue;
+    }
+    const tag = t[2].toLowerCase(), raw = t[3] || "";
+    if (t[1]){
+      for (let k = stack.length - 1; k > 0; k--)
+        if (stack[k].tagName === tag.toUpperCase()){ stack.length = k; break; }
+      continue;
+    }
+    const el = fakeEl(tag), ar = /([-\w:]+)\s*=\s*"([^"]*)"/g;
+    let a;
+    while ((a = ar.exec(raw)) !== null) el.setAttribute(a[1], unescapeHtml(a[2]));
+    stack[stack.length - 1].appendChild(el);
+    if (!VOID_TAGS[tag] && !/\/\s*$/.test(raw)) stack.push(el);
+  }
+  return { root, body };
+}
 
 // The engine picks focuses and sets at random, so an unseeded run is a lottery:
 // it can pass eleven times and fail the twelfth on a season it happened not to
@@ -203,34 +329,113 @@ function seededRandom(){
 const SeededMath = Object.create(Math);
 SeededMath.random = seededRandom;
 
-const win = {
-  WSTRAIN_CONFIG: { url: "https://YOUR-PROJECT.supabase.co", anonKey: "YOUR-ANON-KEY" },
-  supabase: null,
-  addEventListener(){}, removeEventListener(){}, scrollTo(){}, print(){},
-  localStorage: { getItem(){ return null; }, setItem(){}, removeItem(){} },
-  navigator: { clipboard: null },
-  alert(){}, confirm(){ return false; }, setTimeout, clearTimeout, fetch: null,
-  Intl, Date, Math: SeededMath, JSON, console
-};
-win.window = win;
-const doc = {
-  getElementById(){ return fakeEl(); }, createElement(){ return fakeEl(); },
-  createTextNode(t){ return { nodeType: 3, textContent: String(t) }; },
-  body: fakeEl(), activeElement: null, addEventListener(){}, execCommand(){ return true; }
-};
+// The clock is frozen for the same reason the dice are seeded. The app asks the
+// real clock what today is (the default date on the Today screen, whether
+// fmtDate prints the year, how far through the session the pool view thinks it
+// is), so a live clock means the output changes on its own overnight and the
+// pool clock cannot be checked at all.
+//
+// Sunday 1 November 2026 on purpose. It sits in the middle of the simulated
+// season, and it is NOT a class day, so "today" and "the next class day" are two
+// different dates and a screen that muddles them cannot pass.
+const BASE_NOW = Date.parse("2026-11-01T12:00:00Z");
+// Monday, Thursday, Saturday are his class days, so this is the date the Today
+// screen has to offer while the frozen clock says Sunday. Worked out here rather
+// than typed in, so moving the frozen clock does not quietly break the check.
+const NEXT_CLASS = (function(){
+  for (let i = 0; i < 7; i++){
+    const d = new Date(BASE_NOW + i * 86400000), dow = d.getUTCDay();
+    if (dow === 1 || dow === 4 || dow === 6) return d.toISOString().slice(0, 10);
+  }
+  return "";
+})();
+let NOW = BASE_NOW;
+function setNow(ms){ NOW = ms; }
+function advance(ms){ NOW += ms; }
+class FrozenDate extends Date {
+  constructor(){ if (arguments.length === 0) super(NOW); else super(...arguments); }
+  static now(){ return NOW; }
+}
+// A real setTimeout would leave the pool clock rescheduling itself once a second
+// for the rest of the run. The harness keeps the queue instead, so the clock
+// ticks exactly when the suite says it does.
+function makeTimers(){
+  const q = [];
+  let id = 1;
+  return {
+    setTimeout(fn, ms){ q.push({ id, fn, ms }); return id++; },
+    clearTimeout(h){ for (let i = 0; i < q.length; i++) if (q[i].id === h){ q.splice(i, 1); return; } },
+    pending: () => q.length,
+    runOne(){ const t = q.shift(); if (t) t.fn(); return !!t; },
+    reset(){ q.length = 0; }
+  };
+}
+// Enough of a Supabase client that the views which check "am I signed in" can
+// draw. Nothing in the suite lets it be reached for real: every call resolves
+// empty, so a handler that tries to save is a no-op rather than a crash.
+function sbStub(){
+  const chain = {};
+  ["select","update","insert","upsert","delete","eq","in","order","limit","range","maybeSingle","single"]
+    .forEach(k => { chain[k] = () => chain; });
+  chain.then = res => Promise.resolve({ data: [], error: null }).then(res);
+  return {
+    from: () => chain,
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null } }),
+      onAuthStateChange(){ return { data: null }; },
+      signOut: () => Promise.resolve({ error: null })
+    }
+  };
+}
 
 const vm = require("vm");
-const ctx = vm.createContext(Object.assign(win, {
-  document: doc, localStorage: win.localStorage, navigator: win.navigator,
-  AbortController: class { constructor(){ this.signal = {}; } abort(){} }
-}));
-try{
-  vm.runInContext(appScript, ctx, { filename: "index.html" });
-}catch(e){
-  console.log("\n" + BAD + " the app script threw while loading: " + e.message);
-  console.log(e.stack.split("\n").slice(0, 4).join("\n"));
+// One environment per load. The mutation control at the end loads a deliberately
+// broken copy of the app into its own environment, so nothing may be shared.
+function makeEnv(source){
+  const timers = makeTimers();
+  const parsed = parseBody(html);
+  const doc = {
+    documentElement: parsed.root, body: parsed.body, activeElement: null,
+    createElement: tag => fakeEl(tag),
+    createTextNode: t => textNode(t),
+    getElementById(id){
+      let hit = null;
+      walk(parsed.root, e => { if (!hit && e.attrs.id === String(id)) hit = e; });
+      return hit;
+    },
+    addEventListener(){}, removeEventListener(){}, execCommand(){ return true; }
+  };
+  const win = {
+    WSTRAIN_CONFIG: { url: "https://YOUR-PROJECT.supabase.co", anonKey: "YOUR-ANON-KEY" },
+    supabase: null,
+    addEventListener(){}, removeEventListener(){}, scrollTo(){}, print(){},
+    localStorage: { getItem(){ return null; }, setItem(){}, removeItem(){} },
+    navigator: { clipboard: null },
+    alert(){}, confirm(){ return false; },
+    setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout, fetch: null,
+    Intl, Date: FrozenDate, Math: SeededMath, JSON, console
+  };
+  win.window = win;
+  const ctx = vm.createContext(Object.assign(win, {
+    document: doc, localStorage: win.localStorage, navigator: win.navigator,
+    AbortController: class { constructor(){ this.signal = {}; } abort(){} }
+  }));
+  try{
+    vm.runInContext(source, ctx, { filename: "index.html" });
+  }catch(e){
+    return { error: e };
+  }
+  return { E: ctx.WSTRAIN_ENGINE, ctx, win, doc, timers };
+}
+
+const env = makeEnv(appScript);
+if (env.error){
+  console.log("\n" + BAD + " the app script threw while loading: " + env.error.message);
+  console.log(String(env.error.stack || "").split("\n").slice(0, 4).join("\n"));
+  console.log("  (a missing id in <body> lands here: the app calls getElementById at load)");
   process.exit(1);
 }
+const ctx = env.ctx;
 const E = ctx.WSTRAIN_ENGINE;
 const S = E.defaultSettings();
 E.setData({ focuses, library: exercises, games, settings: S, sessions: [], items: {}, coaches: [] });
@@ -712,6 +917,609 @@ const afterCount = E.historyForRepeat({ group: "advanced", date: "2030-01-01" })
 sessions[0].status = "done";
 check(afterCount === beforeCount - 1, "marking a session as not run takes it out of the rotation history",
       "history did not change when a session was marked skipped");
+
+// ---------------------------------------------------------------------------
+// 16. Every view has to paint
+//
+// Until now this file called no render function at all. Every drawing function
+// in the app could have been gutted to an empty body and the suite would still
+// have printed "All checks passed", so it has never protected the interface.
+//
+// From here on the harness draws every screen and reads what came out. The
+// checks are written against content, never against "it did not throw": the
+// title, the goal, every set line, every cue, the totals, the tab labels, the
+// rows in each list, the words on the deck. A blank screen fails all of them,
+// and section 18 proves that by gutting the render functions on purpose and
+// insisting the failures show up.
+// ---------------------------------------------------------------------------
+
+// Two sets whose names no other name contains, so "is it on screen" has one
+// answer. One gets retired and one gets proposed, which is how the views are
+// held to the isLive rule: a retired set must disappear from every list and
+// every count, a proposed one must appear only in the review list.
+const uniqueNamed = exercises.filter(x =>
+  x.name && x.name.length >= 8 &&
+  exercises.filter(y => y.name && y.name.indexOf(x.name) !== -1).length === 1);
+const RETIRED = uniqueNamed[0] || null, PROPOSED = uniqueNamed[1] || null;
+
+const paintLib = exercises.map(x => Object.assign({}, x));
+paintLib.forEach(x => {
+  if (RETIRED && x.code === RETIRED.code) x.active = false;
+  if (PROPOSED && x.code === PROPOSED.code) x.status = "proposed";
+});
+const paintLive = paintLib.filter(x => x.active !== false && (x.status || "active") === "active");
+const paintProposed = paintLib.filter(x => (x.status || "active") === "proposed");
+const paintSessions = seasons[0].sessions.map(s => Object.assign({}, s));
+paintSessions[0].difficulty_rating = 4;
+paintSessions[0].coach_id = "coach-1";
+const paintItems = seasons[0].items;
+const paintCoaches = [{ id: "coach-1", display_name: "Vlad" }];
+const paintUser = { access_token: "t", user: { id: "coach-1", email: "vlad@example.com" } };
+
+// his notation again: the card prints "1,850 m", the test should accept either
+function hasNumber(t, n){
+  const s = String(Math.round(n));
+  return t.indexOf(s) !== -1 || t.indexOf(s.replace(/\B(?=(\d{3})+(?!\d))/g, ",")) !== -1;
+}
+// When a row the harness expected is not there, the check has to say so rather
+// than throw on arr[0] and take the rest of the suite down with it.
+const NOTHING = fakeEl("nothing");
+function at(arr, i){ return (arr && arr[i]) || NOTHING; }
+
+// One sweep, driven through the same seam the app exposes. Returns findings
+// rather than calling check() directly, because section 18 runs this same sweep
+// against deliberately broken copies of the app and needs the failures back as
+// data instead of as output.
+function paintSweep(env){
+  const out = [], seenClass = {}, seenId = {}, seenToken = {}, table = [], dead = [];
+  const E = env.E, doc = env.doc, W = env.win;
+  const result = () => ({ findings: out, classes: seenClass, ids: seenId,
+                          tokens: seenToken, table, dead });
+  function want(what, cond, detail){
+    out.push({ what, ok: !!cond, detail: detail == null ? "" : String(detail) });
+  }
+  function harvest(viewName){
+    walk(doc.documentElement, e => {
+      classesOf(e).forEach(c => { seenClass[c] = true; });
+      if (e.attrs.id) seenId[e.attrs.id] = true;
+      Object.keys(e.style || {}).forEach(k => {
+        (String(e.style[k]).match(/var\(\s*--[-\w]+/g) || [])
+          .forEach(v => { seenToken[v.replace(/var\(\s*/, "")] = true; });
+      });
+      if (e.tagName === "BUTTON" && !(e.listeners.click || []).length)
+        dead.push(viewName + ' "' + label(e) + '"');
+    });
+  }
+  // Every view goes through here, so a gutted renderer trips the floor even if
+  // no named piece of copy happens to be checked for it.
+  function shot(viewName, root, floorEls, floorChars){
+    harvest(viewName);
+    const els = countEls(root), chars = label(root).length;
+    table.push({ viewName, els, chars });
+    want("the " + viewName + " screen paints a tree with words in it",
+         els >= floorEls && chars >= floorChars,
+         els + " elements and " + chars + " characters, wanted " + floorEls + " and " + floorChars);
+    return textOf(root);
+  }
+
+  // A tile is a label and a value. Read the value that belongs to one label.
+  function tileValue(root, lbl){
+    const tl = byClass(root, "tile")
+      .filter(x => byClass(x, "lbl").some(l => label(l) === lbl))[0];
+    return tl ? label(at(byClass(tl, "val"), 0)) : "";
+  }
+  // Everything the library stored for a set has to end up in front of him: the
+  // line, the coaching cue, the rest split, and the Adv 1 and Adv 2 guidance the
+  // mixed group swims off. Presence only, never format, so rewording the card in
+  // pass 2 does not fight the harness.
+  function missingFrom(screenText, session){
+    const gaps = [];
+    const advOf = (b, w) => (w === 1
+      ? (b.adv1 != null ? b.adv1 : (b.item && b.item.steady_variant))
+      : (b.adv2 != null ? b.adv2 : (b.item && b.item.strong_variant))) || "";
+    (session.blocks || []).forEach((b, i) => {
+      const where = "block " + i + " ";
+      if (screenText.indexOf(b.rendered_text) === -1) gaps.push(where + "line");
+      const cue = b.cue || (b.item && b.item.cue);
+      if (cue && screenText.indexOf(cue) === -1) gaps.push(where + "cue");
+      const rest = b.rest_adv1 || (b.item && (b.item.rest_adv1 || b.item.rest));
+      if (rest && screenText.indexOf(rest) === -1) gaps.push(where + "rest");
+      [1, 2].forEach(w => {
+        const a = advOf(b, w);
+        if (a && screenText.indexOf(a) === -1) gaps.push(where + "Adv " + w);
+      });
+    });
+    if (session.endBlock && screenText.indexOf(session.endBlock.rendered_text) === -1)
+      gaps.push("the ending");
+    return gaps;
+  }
+
+  const needed = ["render","startPool","hydrate","setUi","setData","buildSkeleton","asPlainText"];
+  const gone = needed.filter(k => typeof E[k] !== "function");
+  want("the test seam in index.html still exports what these checks drive",
+       gone.length === 0, "missing: " + gone.join(", "));
+  if (gone.length) return result();
+
+  const APP = doc.getElementById("app"), WHO = doc.getElementById("who");
+  want("index.html still carries the two ids the app boots from, #app and #who",
+       !!APP && !!WHO, "#app " + (APP ? "found" : "missing") + ", #who " + (WHO ? "found" : "missing"));
+  if (!APP || !WHO) return result();
+
+  setSeed(4242);
+  setNow(BASE_NOW);
+  E.setData({ focuses, library: paintLib, games, settings: S,
+              sessions: paintSessions, items: paintItems, coaches: paintCoaches });
+
+  // ---- the three screens before he is logged in ---------------------------
+  W.supabase = null;
+  E.setUi({ configured: false, sb: null, session: null, coachRow: null, notCoach: false,
+            offline: false, staleMirror: false, loginError: "", busy: false,
+            generating: false, draft: null, view: "today" });
+  E.render();
+  let t = shot("unconfigured", APP, 5, 60);
+  want("the unconfigured app names the file to edit",
+       /config\.js/.test(t) && /SETUP\.md/.test(t), t.slice(0, 60));
+
+  E.setUi({ configured: true });
+  W.supabase = null;
+  E.render();
+  t = shot("database library missing", APP, 3, 30);
+  want("a missing database library is explained instead of leaving a blank screen",
+       /database library/i.test(t) && /reload/i.test(t), t.slice(0, 60));
+
+  W.supabase = {};
+  E.setUi({ sb: sbStub(), session: null, loginError: "Invalid login credentials" });
+  E.render();
+  t = shot("login", APP, 6, 40);
+  const loginCard = byClass(APP, "login"), inputs = byTag(APP, "input");
+  want("the login screen paints two fields and one button, inside the full width .login card",
+       loginCard.length === 1 && inputs.length === 2 && byTag(APP, "button").length === 1,
+       "login cards " + loginCard.length + ", inputs " + inputs.length +
+       ", buttons " + byTag(APP, "button").length);
+  want("the login fields are an email and a password",
+       inputs.length === 2 && inputs[0].getAttribute("type") === "email" &&
+       inputs[1].getAttribute("type") === "password",
+       inputs.map(i => i.getAttribute("type")).join(", "));
+  want("the login screen says why the last attempt failed",
+       /Invalid login credentials/.test(t) && byClass(APP, "err").length === 1, t.slice(0, 70));
+
+  E.setUi({ session: paintUser, loginError: "", notCoach: true });
+  E.render();
+  t = shot("not a coach", APP, 8, 200);
+  const pre = at(byTag(APP, "pre"), 0);
+  want("the not a coach screen shows his own address and the exact SQL to run",
+       t.indexOf(paintUser.user.email) !== -1 &&
+       /insert into public\.tr_coaches/.test(t) && t.indexOf(paintUser.user.id) !== -1,
+       t.slice(0, 70));
+  want("the SQL block uses the .codeblock class and carries no inline background",
+       classesOf(pre).indexOf("codeblock") !== -1 && !pre.style.background,
+       "class " + pre.className + ", background " + pre.style.background);
+
+  // ---- Today, empty ------------------------------------------------------
+  E.setUi({ notCoach: false, coachRow: paintCoaches[0], draft: null, view: "today" });
+  E.render();
+  t = shot("Today with nothing generated", APP, 20, 200);
+  const tabBtns = byTag(at(byClass(APP, "tabs"), 0), "button");
+  want("the four tabs paint, each with a label and exactly one handler",
+       tabBtns.length === 4 &&
+       tabBtns.every(b => label(b).length > 2 && (b.listeners.click || []).length === 1) &&
+       ["Today","History","Library","Insights"].every(n => tabBtns.some(b => label(b) === n)),
+       tabBtns.map(b => label(b) + "/" + (b.listeners.click || []).length).join(" "));
+  want("exactly one tab is marked as the open one", byClass(APP, "active").length === 1,
+       byClass(APP, "active").length + " marked active");
+  want("the empty Today screen tells him what the button will do",
+       /Press the button/.test(t) && /never repeats/.test(t), t.slice(-90));
+  want("the date defaults to the next class day, not to today",
+       byTag(APP, "input").some(i => i.getAttribute("type") === "date" && i.value === NEXT_CLASS),
+       "wanted " + NEXT_CLASS + ", got " +
+       byTag(APP, "input").map(i => i.getAttribute("type") + "=" + i.value).join(" "));
+  want("the header carries his name and a way out",
+       /Vlad/.test(textOf(WHO)) && /Log out/.test(textOf(WHO)), label(WHO));
+
+  // ---- Today, with a fresh unsaved session -------------------------------
+  const sk = E.buildSkeleton({ date: NEXT_CLASS, slot: "mon_1830", group: "advanced", ending: "cooldown" });
+  want("the generator produced a session to draw", !!sk && sk.blocks.length >= 1);
+  if (!sk) return result();
+  sk.engine = "ai";
+  sk.fallbackNote = "Claude took too long, so this one is written straight from the library.";
+  sk.relaxations = ["Reused a recent focus (focus cooldown), the library is thin."];
+  sk.warnings = (sk.warnings || []).concat(["Runs about 2 min long for the slower swimmers."]);
+  E.setUi({ draft: sk, view: "today" });
+  E.render();
+  t = shot("Today with a session on it", APP, 60, 600);
+
+  const cardMissing = [];
+  if (t.indexOf(sk.title) === -1) cardMissing.push("title");
+  if (t.indexOf(sk.goal) === -1) cardMissing.push("goal");
+  if (!/Warm-up/.test(t)) cardMissing.push("warm-up");
+  want("the card carries the title, the goal and the warm-up",
+       cardMissing.length === 0, "missing: " + cardMissing.join(", "));
+  // Read each number out of its own tile. A search across the whole screen finds
+  // 1,850 somewhere on a busy card whatever the tile says.
+  const mainM = sk.blocks.reduce((a, b) => a + b.distance_m, 0);
+  want("the four tiles carry the metres, the minutes, the main body and the ending",
+       hasNumber(tileValue(APP, "Total"), sk.planned_total_m) &&
+       tileValue(APP, "Planned") === sk.planned_minutes + " min" &&
+       hasNumber(tileValue(APP, "Main body"), mainM) &&
+       tileValue(APP, "Ending") === (sk.ending === "game" ? "Game" : "Cool-down"),
+       ["Total","Planned","Main body","Ending"].map(k => k + ' "' + tileValue(APP, k) + '"').join(", "));
+
+  const setsMissing = missingFrom(t, sk);
+  want("every set on the card reaches the screen: the line, the cue, the rest and both Adv lines",
+       setsMissing.length === 0,
+       (sk.blocks || []).length + " blocks, missing: " + setsMissing.slice(0, 4).join(", "));
+  want("one block card per set, plus the warm-up and the ending",
+       byClass(APP, "blk").length === sk.blocks.length + 1 + (sk.endBlock ? 1 : 0),
+       byClass(APP, "blk").length + " block cards for " + sk.blocks.length + " sets");
+
+  const banners = byClass(APP, "banner").map(label);
+  want("the fallback note, the relaxation and the warning all reach him",
+       banners.some(b => /took too long/.test(b)) &&
+       banners.some(b => /library is thin/.test(b)) &&
+       banners.some(b => /^Check this: /.test(b)),
+       banners.length + " banners: " + banners.map(b => b.slice(0, 24)).join(" | "));
+
+  let acts = byTag(APP, "button").map(label);
+  want("the card offers the four things he does with it, and a Save",
+       ["Start pool view","Copy as text","Print","Save"].every(x => acts.indexOf(x) !== -1),
+       acts.join(" | ").slice(0, 120));
+  want("a rescalable set gets its rep steppers",
+       !sk.blocks.some(b => b.item && b.item.reps) ||
+       (acts.indexOf("−1 rep") !== -1 && acts.indexOf("+1 rep") !== -1),
+       acts.filter(x => /rep$/.test(x)).join(" "));
+  want("the card says who wrote it", /Claude/.test(t), t.slice(0, 40));
+
+  // ---- Today, reopened from the database ---------------------------------
+  const saved = E.hydrate(paintSessions[0]);
+  const storedRows = (paintItems[paintSessions[0].id] || [])
+    .filter(r => r.block_role !== "warmup");
+  want("a saved session hydrates back into as many blocks as were stored",
+       !!saved && saved.blocks.length + (saved.endBlock ? 1 : 0) === storedRows.length,
+       saved ? saved.blocks.length + " blocks plus " + (saved.endBlock ? 1 : 0) +
+               " ending for " + storedRows.length + " stored rows" : "hydrate returned nothing");
+  E.setUi({ draft: saved, view: "today" });
+  E.render();
+  t = shot("a reopened session", APP, 60, 600);
+  const rowsMissing = storedRows.filter(r => r.rendered_text && t.indexOf(r.rendered_text) === -1);
+  const advMissing = storedRows.filter(r =>
+    r.steady_variant && t.indexOf(r.steady_variant) === -1);
+  want("every stored set line comes back out of the database and onto the card",
+       rowsMissing.length === 0, rowsMissing.slice(0, 3).map(r => r.rendered_text).join(" | "));
+  want("the stored Adv 1 and Adv 2 lines survive the round trip",
+       advMissing.length === 0, advMissing.slice(0, 3).map(r => r.steady_variant).join(" | "));
+  acts = byTag(APP, "button").map(label);
+  want("a saved session offers Mark done and Did not run instead of Save",
+       acts.indexOf("Mark done") !== -1 && acts.indexOf("Did not run") !== -1 &&
+       acts.indexOf("Save") === -1, acts.join(" | ").slice(0, 120));
+  const rate = byTag(APP, "button").filter(b => /^[1-5]$/.test(label(b)));
+  want("the after session card shows the 1 to 5 buttons with the stored 4 marked",
+       rate.length === 5 && classesOf(at(rate, 3)).indexOf("primary") !== -1 &&
+       /How hard was it/.test(t),
+       rate.map(b => label(b) + ":" + b.className).join(" "));
+
+  // ---- the pool view -----------------------------------------------------
+  // The one screen read at arm's length with wet hands, and the one pass 2
+  // rebuilds from scratch.
+  env.timers.reset();
+  E.setUi({ draft: null, view: "today" });
+  E.startPool(sk);
+  let poolEl = doc.getElementById("pool");
+  want("the pool view paints one overlay carrying the id its stylesheet targets",
+       !!poolEl && findAll(doc.documentElement, e => e.attrs.id === "pool").length === 1,
+       poolEl ? "one #pool" : "no #pool at all");
+  want("the pool clock schedules exactly one tick", env.timers.pending() === 1,
+       env.timers.pending() + " timers pending");
+  E.render();
+  want("re-drawing the pool view leaves one overlay and one tick, not two",
+       findAll(doc.documentElement, e => e.attrs.id === "pool").length === 1 &&
+       env.timers.pending() === 1,
+       findAll(doc.documentElement, e => e.attrs.id === "pool").length + " overlays, " +
+       env.timers.pending() + " timers");
+  poolEl = doc.getElementById("pool");
+  if (!poolEl) return result();
+  const pt = shot("pool", poolEl, 20, 300);
+  const deckMissing = missingFrom(pt, sk);
+  if (pt.indexOf(sk.goal) === -1) deckMissing.push("goal");
+  want("everything on the card is on the deck too: lines, cues, rest and both Adv lines",
+       deckMissing.length === 0, "missing: " + deckMissing.slice(0, 4).join(", "));
+  const pblks = byClass(poolEl, "pblk");
+  want("one tappable card per set on the deck, plus the warm-up and the ending",
+       pblks.length === sk.blocks.length + 1 + (sk.endBlock ? 1 : 0) &&
+       (at(pblks, 1).listeners.click || []).length === 1,
+       pblks.length + " deck cards for " + sk.blocks.length + " sets");
+  const poolActs = byTag(poolEl, "button").map(label);
+  want("the deck keeps Close, Mark done and Copy",
+       ["Close","Mark done","Copy"].every(x => poolActs.indexOf(x) !== -1), poolActs.join(" | "));
+
+  const clock = at(byClass(poolEl, "clock"), 0);
+  want("the clock starts at 0:00", label(clock) === "0:00", label(clock) || "no clock at all");
+  advance(90 * 60 * 1000);
+  env.timers.runOne();
+  want("the clock counts up in minutes and seconds", label(clock) === "90:00", label(clock));
+  want("with nothing ticked off yet the clock does not call him behind",
+       classesOf(clock).indexOf("behind") === -1, clock.className);
+  const tapped = at(pblks, 1);
+  const toggled = fire(tapped, "click");
+  want("tapping a set on the deck marks it done, by class and not by colour alone",
+       toggled === 1 && classesOf(tapped).indexOf("done") !== -1,
+       "handlers " + toggled + ", class " + tapped.className);
+  env.timers.runOne();
+  want("once there is progress to compare against, behind schedule inverts the clock",
+       classesOf(clock).indexOf("behind") !== -1, clock.className);
+  // The done and behind classes only exist after those two taps, so harvest again
+  // or section 17 never sees them.
+  harvest("pool part way through");
+  fire(at(byTag(poolEl, "button").filter(b => label(b) === "Close"), 0), "click");
+  want("closing the deck takes the overlay off the page and stops the clock",
+       doc.getElementById("pool") === null && env.timers.pending() === 0,
+       (doc.getElementById("pool") ? "overlay still there" : "overlay gone") + ", " +
+       env.timers.pending() + " timers left");
+
+  // ---- History, Library, Insights, reached the way he reaches them --------
+  // Back to a known screen first. If the Close button above is broken, that is
+  // one failure, and the rest of the sweep should still report on itself.
+  E.setUi({ draft: saved, view: "today" });
+  E.render();
+  function tab(name){
+    const b = byTag(APP, "button").filter(x => label(x) === name)[0];
+    if (!b) return false;
+    fire(b, "click");
+    return true;
+  }
+  want("the History tab is wired to something", tab("History"));
+  t = shot("History", APP, 30, 300);
+  const hrows = byClass(APP, "hrow");
+  want("history lists every saved session, newest first, each one tappable",
+       hrows.length === paintSessions.length &&
+       label(at(hrows, 0)).indexOf(paintSessions[0].title) !== -1 &&
+       hrows.every(r => (r.listeners.click || []).length === 1),
+       hrows.length + " rows for " + paintSessions.length + " sessions");
+  want("history groups by week and shows the slot, the metres, the coach and the rating",
+       /Week of /.test(t) && /Vlad/.test(t) && /4\/5/.test(t) &&
+       hasNumber(label(at(hrows, 0)), paintSessions[0].planned_total_m),
+       label(at(hrows, 0)).slice(0, 80));
+
+  want("the Library tab is wired to something", tab("Library"));
+  t = shot("Library", APP, 30, 300);
+  const lrows = byClass(APP, "lrow");
+  want("the library lists every live set, and the proposed one on top of that",
+       lrows.length === paintLive.length + paintProposed.length,
+       lrows.length + " rows for " + paintLive.length + " live plus " +
+       paintProposed.length + " proposed");
+  want("the library counts live sets only, so a retired set is not in the total",
+       t.indexOf(paintLive.length + " sets") !== -1,
+       "wanted " + paintLive.length + " sets");
+  want("a retired set is not listed anywhere",
+       !RETIRED || t.indexOf(RETIRED.name) === -1, RETIRED ? RETIRED.name : "no fixture");
+  want("a set Claude proposed is offered for review, and marked as such",
+       !PROPOSED || (t.indexOf(PROPOSED.name) !== -1 && /Claude suggests/.test(t)),
+       PROPOSED ? PROPOSED.name : "no fixture");
+  want("the library says when a set is still locked out by the no-repeat window",
+       byClass(APP, "badge").map(label).some(x => /^back in \d+ session/.test(x)),
+       byClass(APP, "badge").map(label).slice(0, 6).join(" | "));
+
+  want("the Insights tab is wired to something", tab("Insights"));
+  t = shot("Insights", APP, 40, 400);
+  want("insights counts the sessions and the live library, not the retired one",
+       tileValue(APP, "Sessions") === String(paintSessions.length) &&
+       tileValue(APP, "Library") === String(paintLive.length),
+       'Sessions "' + tileValue(APP, "Sessions") + '" wanted ' + paintSessions.length +
+       ', Library "' + tileValue(APP, "Library") + '" wanted ' + paintLive.length);
+  want("one focus balance bar per focus", byClass(APP, "bar").length === focuses.length,
+       byClass(APP, "bar").length + " bars for " + focuses.length + " focuses");
+  want("the settings rows paint their current values",
+       /Steady pace/.test(t) &&
+       byTag(APP, "input").some(i => i.value === String(S.pace_steady_s_per_100)),
+       byTag(APP, "input").map(i => i.value).join(" "));
+
+  // ---- the offline banners -----------------------------------------------
+  tab("Today");
+  E.setUi({ offline: true, staleMirror: false });
+  E.render();
+  t = shot("Today offline", APP, 20, 200);
+  want("offline says what still works and what will not be saved",
+       /No connection/.test(t) && /saved on this phone/.test(t), t.slice(0, 80));
+  E.setUi({ staleMirror: true });
+  E.render();
+  t = textOf(APP);
+  harvest("Today offline and stale");
+  want("a copy more than ten days old says so", /ten days old/.test(t), t.slice(0, 80));
+  E.setUi({ offline: false, staleMirror: false });
+
+  want("no view paints a button with nothing behind it", dead.length === 0,
+       dead.slice(0, 5).join(", "));
+  return result();
+}
+
+console.log("\n=== 16. Every view has to paint");
+let sweep;
+try{
+  sweep = paintSweep(env);
+}catch(e){
+  // A throw here is a regression too, it just cannot report itself, so say where
+  // it happened and let the rest of the suite finish and print its summary.
+  bad("the paint sweep threw: " + e.message);
+  console.log("    " + String(e.stack || "").split("\n")[1]);
+  sweep = { findings: [], classes: {}, ids: {}, tokens: {}, table: [], dead: [] };
+}
+sweep.findings.forEach(f =>
+  check(f.ok, f.what, f.what + (f.detail ? "  [" + f.detail + "]" : "")));
+console.log("  painted: " + sweep.table
+  .map(r => r.viewName + " " + r.els + "el/" + r.chars + "ch").join(", "));
+
+// ---------------------------------------------------------------------------
+// 17. The engine and the stylesheet have to agree
+//
+// The bug class the harness could not see: the engine hands out a class or an id,
+// the stylesheet knows a different name, and the screen goes plain. Nothing
+// throws, no text is missing, every other check passes, and the app looks broken
+// only on the phone. So the sweep above collects every class, id and custom
+// property the engine actually assigned, and this section holds them against the
+// stylesheet that shipped with them.
+// ---------------------------------------------------------------------------
+const styleSrc = (html.match(/<style>([\s\S]*?)<\/style>/) || ["", ""])[1]
+  .replace(/\/\*[\s\S]*?\*\//g, "");
+const styledClasses = new Set([...styleSrc.matchAll(/\.(-?[A-Za-z_][-\w]*)/g)].map(m => m[1]));
+// A hex colour is not an id. Values sit after a colon, so requiring whitespace or
+// a combinator in front of the # plus rejecting hex-shaped names is enough.
+const styledIds = new Set([...styleSrc.matchAll(/(^|[\s,>+~(])#([A-Za-z_][-\w]*)/g)]
+  .map(m => m[2]).filter(n => !/^[0-9a-fA-F]{3,8}$/.test(n)));
+const definedTokens = new Set([...styleSrc.matchAll(/(--[-\w]+)\s*:/g)].map(m => m[1]));
+// Every themed surface is defined twice, once plainly and once inside the dark
+// block, and some are defined a third time for Increase Contrast. A token that
+// only survives inside one of those blocks is undefined for everyone the block
+// does not match, which on a pool deck in daylight is most people. So the
+// unconditional definitions are counted on their own.
+function withoutMediaBlocks(css){
+  let out = "";
+  for (let i = 0; i < css.length; i++){
+    if (css.startsWith("@media", i)){
+      const open = css.indexOf("{", i);
+      if (open !== -1){
+        let depth = 0, j = open;
+        for (; j < css.length; j++){
+          if (css[j] === "{") depth++;
+          else if (css[j] === "}" && --depth === 0){ j++; break; }
+        }
+        i = j - 1;
+        continue;
+      }
+    }
+    out += css[i];
+  }
+  return out;
+}
+const baseTokens = new Set([...withoutMediaBlocks(styleSrc).matchAll(/(--[-\w]+)\s*:/g)].map(m => m[1]));
+const cssTokenUses = new Set([...styleSrc.matchAll(/var\(\s*(--[-\w]+)/g)].map(m => m[1]));
+const idLookups = [...new Set([...appScript.matchAll(/getElementById\(\s*"([^"]+)"/g)].map(m => m[1]))];
+const markupIds = new Set();
+walk(parseBody(html).root, e => { if (e.attrs.id) markupIds.add(e.attrs.id); });
+
+function analyse(s){
+  const out = [];
+  function want(what, cond, detail){
+    out.push({ what, ok: !!cond, detail: detail == null ? "" : String(detail) });
+  }
+  const live = Object.keys(s.ids);
+  const strayLookup = idLookups.filter(id => live.indexOf(id) === -1);
+  want("every id the engine looks up exists, in the markup or because the engine makes it",
+       strayLookup.length === 0,
+       "getElementById asks for " + strayLookup.join(", ") + " and nothing has that id");
+  const strayStyled = [...styledIds].filter(id => live.indexOf(id) === -1);
+  want("every id the stylesheet targets is an id something actually has",
+       strayStyled.length === 0,
+       "the stylesheet styles #" + strayStyled.join(", #") + " and nothing carries it");
+  const unstyled = Object.keys(s.classes).filter(c => !styledClasses.has(c));
+  want("every class the engine assigns is a class the stylesheet styles",
+       unstyled.length === 0,
+       "assigned but unstyled: " + unstyled.join(", "));
+  const strayToken = Object.keys(s.tokens).filter(v => !definedTokens.has(v));
+  want("every custom property an inline style reaches for is defined",
+       strayToken.length === 0,
+       "used in a style prop but never defined: " + strayToken.join(", "));
+  const strayCssToken = [...cssTokenUses].filter(v => !definedTokens.has(v));
+  want("every custom property the stylesheet reaches for is defined",
+       strayCssToken.length === 0, "used in CSS but never defined: " + strayCssToken.join(", "));
+  const conditional = [...cssTokenUses].concat(Object.keys(s.tokens))
+    .filter(v => definedTokens.has(v) && !baseTokens.has(v));
+  want("every custom property in use has a plain definition, not only one inside a media query",
+       conditional.length === 0,
+       "defined only inside a media query, so it is missing whenever that query does not match: " +
+       [...new Set(conditional)].join(", "));
+  return out;
+}
+
+console.log("\n=== 17. The engine and the stylesheet agree on names");
+analyse(sweep).forEach(f =>
+  check(f.ok, f.what, f.what + (f.detail ? "  [" + f.detail + "]" : "")));
+const orphanClasses = [...styledClasses].filter(c => !sweep.classes[c]);
+console.log("  " + Object.keys(sweep.classes).length + " classes painted, " +
+  styledClasses.size + " styled, " + definedTokens.size + " tokens defined");
+// Reported, not failed. A rule can be for a state the sweep does not reach, and
+// a harness that fails on dead CSS would fight every half-finished pass 2 edit.
+if (orphanClasses.length)
+  console.log("  styled but never painted in this sweep, so possibly dead: ." +
+    orphanClasses.join(", ."));
+
+// ---------------------------------------------------------------------------
+// 18. The paint checks can actually fail
+//
+// A check that draws a screen and shrugs is worse than no check, because it
+// reads as protection. So the suite breaks the app on purpose, five ways, loads
+// each broken copy into its own sandbox, and runs the same sweep against it. If
+// a mutant comes back clean, the sweep is decoration and this section says so.
+//
+// Two of the mutants only change a name, never a word on screen. Those must slip
+// past section 16 and be caught by section 17, which is the whole point of 17.
+// ---------------------------------------------------------------------------
+console.log("\n=== 18. The paint checks fail when the app is broken (control)");
+const MUTANTS = [
+  { what: "renderSessionCard gutted to an empty body",
+    from: "function renderSessionCard(sk, editable){",
+    to:   "function renderSessionCard(sk, editable){ if (1) return;",
+    caughtBy: "paint" },
+  { what: "renderPool gutted to an empty body",
+    from: "function renderPool(){",
+    to:   "function renderPool(){ if (1) return;",
+    caughtBy: "paint" },
+  { what: "h() dropping every child, so the whole app paints empty boxes",
+    from: "for (var i=2;i<arguments.length;i++){",
+    to:   "for (var i=2;i<2;i++){",
+    caughtBy: "paint" },
+  { what: "the pool overlay renamed away from the id the stylesheet targets",
+    from: 'h("div",{id:"pool"})',
+    to:   'h("div",{id:"deck"})',
+    caughtBy: "either" },
+  { what: "the goal box renamed to a class the stylesheet does not style",
+    from: 'h("div",{class:"goalbox"}',
+    to:   'h("div",{class:"goalbx"}',
+    caughtBy: "names" },
+  { what: "an inline style reaching for a custom property that does not exist",
+    from: 'style:{color:"var(--accent-text)"}',
+    to:   'style:{color:"var(--accent-ink)"}',
+    caughtBy: "names" }
+];
+const healthy = sweep.findings.every(f => f.ok);
+MUTANTS.forEach(m => {
+  const broken = appScript.split(m.from).join(m.to);
+  if (broken === appScript){
+    bad('the control cannot break the app that way any more, so it proves nothing: "' +
+        m.from.slice(0, 46) + '"');
+    return;
+  }
+  const menv = makeEnv(broken);
+  let paintFails = [], nameFails = [];
+  if (menv.error){
+    paintFails = [{ what: "the broken copy would not even load: " + menv.error.message }];
+  } else {
+    try{
+      const ms = paintSweep(menv);
+      paintFails = ms.findings.filter(f => !f.ok);
+      nameFails = analyse(ms).filter(f => !f.ok);
+    }catch(e){
+      paintFails = [{ what: "the sweep threw: " + e.message }];
+    }
+  }
+  const first = (paintFails[0] || nameFails[0] || {}).what || "";
+  if (m.caughtBy === "paint" || m.caughtBy === "either"){
+    check(paintFails.length + nameFails.length > 0,
+      m.what + ": caught, " + (paintFails.length + nameFails.length) +
+      " checks fail, first is \"" + first.slice(0, 52) + "\"",
+      m.what + ": NOT CAUGHT. Section 16 passes on a broken app, so it is decoration.");
+  } else {
+    // The isolation half of the claim only means anything while section 16 is
+    // green. Once the app itself is failing, the same failure turns up in every
+    // mutant and says nothing about this control.
+    check(nameFails.length > 0 && (!healthy || paintFails.length === 0),
+      m.what + ": slips past the words on screen and is caught by the name check",
+      m.what + ": " + (nameFails.length ? "" : "NOT CAUGHT by the name check. ") +
+      (healthy && paintFails.length ? paintFails.length + " paint checks also failed, so the control is not isolating anything." : ""));
+  }
+});
+// The sweep left the seeded generator and the frozen clock where the mutants put
+// them, so put them back for anything that runs after this.
+setSeed(1);
+setNow(BASE_NOW);
 
 // ---------------------------------------------------------------------------
 console.log("\n" + "=".repeat(64));
