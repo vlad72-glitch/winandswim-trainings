@@ -231,9 +231,11 @@ clock against the planned minutes. Tap a block to tick it off. Big targets,
 because your hands are wet.
 
 **After the session**, mark it **done**, tap a difficulty from 1 to 5, and add
-one line if you want. Two 5s in a row and the next session comes down 100 m; two
-1s and it goes up. If a class did not happen, mark it **did not run** and its
-sets go straight back into the rotation.
+one line if you want. The rating and the note are saved with the session so you
+can look back at what landed hard, and they show up in History. They do not
+change what the generator does next: the volume comes from the two pace numbers
+at the bottom of Insights, which you adjust yourself. If a class did not happen,
+mark it **did not run** and its sets go straight back into the rotation.
 
 **Copy as text** puts the whole session on the clipboard for Notes or WhatsApp.
 
