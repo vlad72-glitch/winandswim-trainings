@@ -1,7 +1,7 @@
 /* Win and Swim Training Generator — service worker.
    Bump CACHE_NAME (v1 → v2 → …) whenever you change any file, so
    installed phones drop the old cached version. */
-var CACHE_NAME = "ws-training-v2";
+var CACHE_NAME = "ws-training-v3";
 var ASSETS = [
   "./",
   "./index.html",
