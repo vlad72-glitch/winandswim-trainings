@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="W&S Trainings">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0284c7">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>W&S Training Generator</title>
+<style>
+  :root{
+    --bg:#f3f6f8; --card:#ffffff; --ink:#13212b; --muted:#5f7280; --line:#e1e8ed;
+    --accent:#0284c7; --accent-ink:#075985; --accent-bg:#e0f2fe;
+    --good:#15803d; --good-bg:#dcfce7; --bad:#dc2626; --bad-bg:#fef2f2;
+    --warn:#b45309; --warn-bg:#fff7ed;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.45; -webkit-text-size-adjust:100%;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .wrap{max-width:860px;margin:0 auto;padding:14px 14px 60px;}
+  header{display:flex;align-items:center;gap:10px;padding:10px 4px;flex-wrap:wrap;}
+  header h1{font-size:1.15rem;margin:0;font-weight:700;display:flex;align-items:center;gap:7px;}
+  header .spacer{flex:1;}
+  nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 2px 14px;}
+  nav.tabs button{border-radius:999px;padding:6px 14px;font-size:.92rem;}
+  nav.tabs button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button{
+    font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:9px;padding:7px 12px;transition:background .12s,border-color .12s;
+  }
+  button:hover{background:#eef3f6;}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button.primary:hover{background:#0369a1;}
+  button.good{background:var(--good);border-color:var(--good);color:#fff;}
+  button.ghost{background:transparent;border-color:transparent;color:var(--muted);padding:5px 8px;}
+  button.ghost:hover{background:#e9eef1;color:var(--ink);}
+  button.danger{color:var(--bad);border-color:transparent;background:transparent;}
+  button.danger:hover{background:var(--bad-bg);}
+  button:disabled{opacity:.5;cursor:default;}
+  button.small{padding:3px 8px;font-size:.8rem;border-radius:7px;}
+  button.big{padding:16px 22px;font-size:1.1rem;font-weight:600;border-radius:12px;}
+  input,select,textarea{
+    font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 10px;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-bg);border-color:var(--accent);}
+  select.small,input.small{padding:4px 8px;font-size:.85rem;}
+  textarea{width:100%;min-height:70px;resize:vertical;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px;
+    box-shadow:0 1px 2px rgba(16,42,58,.04);}
+  .card h2{margin:0 0 2px;font-size:1.15rem;}
+  .row{display:flex;align-items:center;gap:10px;}
+  .row.wrap{flex-wrap:wrap;}
+  .muted{color:var(--muted);} .small{font-size:.85rem;} .tiny{font-size:.78rem;}
+  .stack>*+*{margin-top:10px;}
+  .section-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px;}
+  .err{background:var(--bad-bg);color:var(--bad);border:1px solid #f3c2c2;border-radius:9px;padding:8px 10px;font-size:.9rem;margin-top:8px;}
+  .banner{background:var(--warn-bg);color:var(--warn);border:1px solid #fcd9a8;border-radius:9px;padding:8px 10px;font-size:.88rem;margin-bottom:12px;}
+  .banner.ok{background:var(--good-bg);color:var(--good);border-color:#b7e4c3;}
+  .banner.info{background:var(--accent-bg);color:var(--accent-ink);border-color:#bae0f5;}
+  .center{text-align:center;}
+  .empty{text-align:center;color:var(--muted);padding:26px 10px;}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;}
+  .tile .lbl{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
+  .tile .val{font-size:1.35rem;font-weight:700;margin-top:2px;}
+  .tile .sub{font-size:.78rem;color:var(--muted);margin-top:2px;}
+  .badge{font-size:.7rem;font-weight:600;background:#eef3f6;color:var(--muted);padding:1px 7px;border-radius:999px;white-space:nowrap;}
+  .badge.warn{background:var(--warn-bg);color:var(--warn);}
+  .badge.ok{background:var(--good-bg);color:var(--good);}
+  .badge.accent{background:var(--accent-bg);color:var(--accent-ink);}
+  /* session blocks */
+  .blk{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--card);}
+  .blk .role{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+  .blk .line{font-size:1.08rem;font-weight:650;margin-top:3px;}
+  .blk .cue{color:var(--accent-ink);font-size:.94rem;margin-top:5px;}
+  .blk .watch{color:var(--muted);font-size:.86rem;margin-top:4px;}
+  .blk .adv{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .blk .adv span{font-size:.8rem;background:#f5f8fa;border:1px solid var(--line);border-radius:7px;padding:3px 8px;}
+  .blk .meta{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;}
+  .goalbox{background:var(--accent-bg);border:1px solid #bae0f5;border-radius:12px;padding:12px 14px;margin-bottom:12px;}
+  .goalbox .lbl{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent-ink);}
+  .goalbox .txt{margin-top:3px;font-size:1rem;}
+  /* history */
+  .hrow{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:.92rem;cursor:pointer;}
+  .hrow:last-child{border-bottom:none;}
+  .hrow:hover{background:#f7fafb;}
+  .hdate{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;width:92px;flex-shrink:0;}
+  .hmain{flex:1;min-width:0;}
+  .htitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* library */
+  .lrow{display:flex;align-items:flex-start;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:.9rem;}
+  .lrow:last-child{border-bottom:none;}
+  .lrow .lmain{flex:1;min-width:0;}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  .filters input[type=search]{flex:1;min-width:130px;}
+  .bar{height:8px;background:#eef3f6;border-radius:999px;overflow:hidden;}
+  .bar>i{display:block;height:100%;background:var(--accent);}
+  /* ---------- pool view: bright hall, wet fingers ---------- */
+  #pool{position:fixed;inset:0;background:#fff;color:#000;z-index:50;overflow-y:auto;
+        padding:calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 20px);}
+  #pool .ptop{display:flex;align-items:center;gap:10px;position:sticky;top:0;background:#fff;
+        padding:6px 0 10px;border-bottom:2px solid #000;margin-bottom:12px;}
+  #pool .clock{font-size:1.9rem;font-weight:800;font-variant-numeric:tabular-nums;}
+  #pool .clock.behind{color:var(--bad);}
+  #pool .pgoal{font-size:1.1rem;font-weight:600;margin-bottom:14px;}
+  #pool .pblk{border:3px solid #000;border-radius:14px;padding:14px;margin-bottom:12px;min-height:56px;cursor:pointer;}
+  #pool .pblk.done{border-color:#9aa7ae;color:#9aa7ae;background:#f7f9fa;}
+  #pool .pblk .prole{font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;}
+  #pool .pblk .pline{font-size:1.85rem;font-weight:800;line-height:1.2;margin-top:4px;}
+  #pool .pblk .pcue{font-size:1.25rem;margin-top:8px;font-weight:600;}
+  #pool .pblk .padv{font-size:1.05rem;margin-top:8px;}
+  #pool button{min-height:52px;font-size:1.05rem;font-weight:700;border:2px solid #000;}
+  @media (max-width:560px){
+    .wrap{padding:10px 10px 60px;}
+    #pool .pblk .pline{font-size:1.55rem;}
+  }
+  @media print{
+    nav.tabs,button,header .spacer{display:none !important;}
+    body{background:#fff;} .card,.blk{box-shadow:none;border-color:#999;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏊 W&amp;S Trainings</h1>
+    <span class="spacer"></span>
+    <span id="who"></span>
+  </header>
+  <div id="app"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ==========================================================================
+  // tiny DOM helper (same shape as the other Win and Swim apps)
+  // ==========================================================================
+  function h(tag, props){
+    var e = document.createElement(tag);
+    if (props) for (var k in props){
+      var v = props[k];
+      if (v == null || v === false) continue;
+      if (k === "class") e.className = v;
+      else if (k === "html") e.innerHTML = v;
+      else if (k === "style" && typeof v === "object") Object.assign(e.style, v);
+      else if (k.slice(0,2) === "on" && typeof v === "function") e.addEventListener(k.slice(2), v);
+      else if (v === true) e.setAttribute(k, "");
+      else e.setAttribute(k, v);
+    }
+    for (var i=2;i<arguments.length;i++){
+      var kid = arguments[i];
+      (Array.isArray(kid) ? kid : [kid]).forEach(function(c){
+        if (c == null || c === false) return;
+        e.append(c.nodeType ? c : document.createTextNode(String(c)));
+      });
+    }
+    return e;
+  }
+  function clear(node){ while(node.firstChild) node.removeChild(node.firstChild); }
+  var APP = document.getElementById("app");
+  var WHO = document.getElementById("who");
+
+  // ==========================================================================
+  // dates — always Europe/Amsterdam. A naive toISOString() puts a Sunday
+  // evening prep session on Monday, which would silently corrupt the history.
+  // ==========================================================================
+  var TZ = "Europe/Amsterdam";
+  function todayISO(){ return new Date().toLocaleDateString("en-CA", { timeZone: TZ }); }
+  function isoDow(iso){                       // 0 Sun .. 6 Sat, pinned at noon UTC
+    return new Date(iso + "T12:00:00Z").getUTCDay();
+  }
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  function fmtDate(iso){
+    if (!iso) return "";
+    var p = String(iso).split("-");
+    if (p.length !== 3) return iso;
+    var thisYear = String(new Date().getFullYear());
+    return Number(p[2]) + " " + MONTHS[Number(p[1])-1] + (p[0] === thisYear ? "" : " " + p[0].slice(2));
+  }
+  function fmtDayDate(iso){ return DAYS[isoDow(iso)] + " " + fmtDate(iso); }
+
+  // his three class slots
+  var SLOTS = [
+    { key:"mon_1830", dow:1, label:"Monday 18:30" },
+    { key:"thu_1930", dow:4, label:"Thursday 19:30" },
+    { key:"sat_1600", dow:6, label:"Saturday 16:00" },
+    { key:"other",    dow:-1, label:"Other" }
+  ];
+  function slotForDate(iso){
+    var d = isoDow(iso);
+    for (var i=0;i<SLOTS.length;i++) if (SLOTS[i].dow === d) return SLOTS[i].key;
+    return "other";
+  }
+  function slotLabel(key){
+    for (var i=0;i<SLOTS.length;i++) if (SLOTS[i].key === key) return SLOTS[i].label;
+    return key || "Other";
+  }
+  function nextClassISO(){
+    var t = todayISO();
+    for (var i=0;i<7;i++){
+      var d = new Date(t + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + i);
+      var iso = d.toISOString().slice(0,10);
+      if (slotForDate(iso) !== "other") return iso;
+    }
+    return t;
+  }
+  // his notation: "1,820 m", not "1.82k m"
+  function fmtM(m){ return String(Math.round(m)).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " m"; }
+  function mmss(s){
+    s = Math.max(0, Math.round(s));
+    var m = Math.floor(s/60), r = s % 60;
+    return m + ":" + (r < 10 ? "0" : "") + r;
+  }
+
+  // ==========================================================================
+  // config / client
+  // ==========================================================================
+  var cfg = window.WSTRAIN_CONFIG || {};
+  var configured = cfg.url && cfg.anonKey &&
+                   cfg.url.indexOf("YOUR-") === -1 && cfg.anonKey.indexOf("YOUR-") === -1;
+  var sb = null;
+  if (configured && window.supabase) sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+
+  var AI_FN = "generate-session";
+  var AI_TIMEOUT_MS = 45000;      // strictly greater than the function's own 40 s budget,
+                                  // so the function always answers before we give up on it
+
+  // ==========================================================================
+  // state
+  // ==========================================================================
+  var session = null, coachRow = null, loginError = "", notCoach = false;
+  var data = { focuses:[], library:[], games:[], sessions:[], items:{}, settings:null, history:[] };
+  var view = { name:"today" };
+  var draft = null;               // the session on screen, saved or not
+  var busy = false, generating = false;
+  var offline = false, staleMirror = false;
+  var poolState = null;           // { startedAt, timer }
+  var lib = { q:"", role:"", focus:"", showProposed:false };
+
+  var MIRROR_KEY = "wstrain.mirror.v1";
+
+  // ==========================================================================
+  // the coaching model that lives in code: block skeletons per focus.
+  // share_of_main sums to 1 across each archetype. The ending (a cool-down or
+  // a game) is appended separately, so these cover the main body only.
+  // ==========================================================================
+  var ARCHETYPES = {
+    technique: [
+      { role:"activation", share:0.12 }, { role:"technique_drill", share:0.26 },
+      { role:"technique_drill", share:0.15 }, { role:"main_set", share:0.47 }
+    ],
+    endurance: [
+      { role:"activation", share:0.09 }, { role:"main_set", share:0.70 }, { role:"pull_set", share:0.21 }
+    ],
+    pacing: [
+      { role:"activation", share:0.11 }, { role:"technique_drill", share:0.17 },
+      { role:"main_set", share:0.61 }, { role:"sprint_set", share:0.11 }
+    ],
+    speed: [
+      { role:"activation", share:0.11 }, { role:"technique_drill", share:0.20 },
+      { role:"sprint_set", share:0.36 }, { role:"main_set", share:0.33 }
+    ],
+    legs: [
+      { role:"activation", share:0.09 }, { role:"kick_set", share:0.36 },
+      { role:"kick_set", share:0.23 }, { role:"main_set", share:0.32 }
+    ],
+    arms: [
+      { role:"activation", share:0.09 }, { role:"technique_drill", share:0.17 },
+      { role:"pull_set", share:0.40 }, { role:"main_set", share:0.34 }
+    ],
+    turns: [
+      { role:"activation", share:0.09 }, { role:"turns", share:0.34 },
+      { role:"turns", share:0.20 }, { role:"main_set", share:0.37 }
+    ],
+    skill: [
+      { role:"activation", share:0.09 }, { role:"technique_drill", share:0.17 },
+      { role:"skill_set", share:0.40 }, { role:"main_set", share:0.34 }
+    ],
+    openwater: [
+      { role:"activation", share:0.09 }, { role:"skill_set", share:0.20 },
+      { role:"open_water", share:0.46 }, { role:"main_set", share:0.25 }
+    ],
+    mixed: [
+      { role:"activation", share:0.11 }, { role:"technique_drill", share:0.20 },
+      { role:"main_set", share:0.51 }, { role:"kick_set", share:0.18 }
+    ],
+    // His "Warmup / 3x800" days: after the warm-up the whole session is one
+    // set, with no opener. That is exactly how he writes them, and it is also
+    // the only way an 800 m repeat fits a 45 minute main block.
+    bigset: [
+      { role:"main_set", share:1.0 }
+    ]
+  };
+  var FOCUS_ARCHETYPES = {
+    freestyle_technique:["technique","skill"],
+    body_position:["technique","legs"],
+    breath_control:["skill","technique"],
+    stroke_count:["skill","technique"],
+    arms_pull:["arms"],
+    legs_kick:["legs","bigset"],
+    turns_underwater:["turns"],
+    butterfly_kicks:["legs","turns"],
+    breaststroke:["technique","mixed"],
+    backstroke:["technique","mixed"],
+    aerobic_endurance:["endurance","pacing","bigset"],
+    progressive_pacing:["pacing","speed","bigset"],
+    sprint_speed:["speed"],
+    mixed_strokes:["mixed","technique"],
+    open_water:["openwater"]
+  };
+  var ROLE_LABEL = {
+    activation:"Opener", technique_drill:"Technique", main_set:"Main set",
+    kick_set:"Legs", pull_set:"Arms", sprint_set:"Sprints", skill_set:"Skill set",
+    turns:"Turns", open_water:"Open water", cooldown:"Cool-down", game:"Game",
+    warmup:"Warm-up"
+  };
+
+  // ==========================================================================
+  // supabase reads, with a localStorage mirror so the pool deck still works
+  // when the wifi does not.
+  // ==========================================================================
+  async function pageAll(table, order){
+    var all = [], from = 0, page = 1000;
+    for(;;){
+      var q = sb.from(table).select("*");
+      if (order) q = q.order(order.col, { ascending: !!order.asc });
+      var r = await q.range(from, from + page - 1);
+      if (r.error) throw r.error;
+      all = all.concat(r.data || []);
+      if (!r.data || r.data.length < page) break;
+      from += page;
+    }
+    return all;
+  }
+
+  async function loadAll(){
+    if (!sb || !session) return;
+    var res = await Promise.all([
+      sb.from("tr_focuses").select("*").order("sort_order"),
+      sb.from("tr_games").select("*"),
+      sb.from("tr_settings").select("*").eq("id",1).maybeSingle(),
+      sb.from("tr_sessions").select("*").order("session_date",{ascending:false}).order("id",{ascending:false}).limit(200),
+      sb.from("tr_coaches").select("*")
+    ]);
+    var bad = res.find(function(r){ return r.error; });
+    if (bad) throw bad.error;
+    data.focuses  = res[0].data || [];
+    data.games    = res[1].data || [];
+    data.settings = res[2].data || defaultSettings();
+    data.sessions = res[3].data || [];
+    data.coaches  = res[4].data || [];
+    data.library  = await pageAll("tr_exercises");
+
+    // items for the sessions we might show or reopen
+    var ids = data.sessions.slice(0, 40).map(function(s){ return s.id; });
+    data.items = {};
+    if (ids.length){
+      var it = await sb.from("tr_session_items").select("*").in("session_id", ids).order("position");
+      if (it.error) throw it.error;
+      (it.data || []).forEach(function(row){
+        (data.items[row.session_id] = data.items[row.session_id] || []).push(row);
+      });
+    }
+    offline = false; staleMirror = false;
+    saveMirror();
+  }
+
+  function defaultSettings(){
+    return { id:1, pace_steady_s_per_100:150, pace_strong_s_per_100:110, no_repeat_sessions:6,
+      family_cooldown_sessions:3, focus_cooldown_sessions:2, main_min_m:1500, main_max_m:1800,
+      total_minutes:60, warmup_minutes:10, cooldown_minutes:5, game_minutes:10,
+      explain_seconds_per_set:30, max_paddle_m:700, max_breath_blocks:1,
+      max_underwater_blocks:2, default_ending:"cooldown" };
+  }
+
+  function saveMirror(){
+    try{
+      localStorage.setItem(MIRROR_KEY, JSON.stringify({
+        at: Date.now(),
+        focuses: data.focuses, games: data.games, settings: data.settings,
+        library: data.library, coaches: data.coaches,
+        sessions: data.sessions.slice(0, 20),
+        items: pickItems(data.sessions.slice(0, 20))
+      }));
+    }catch(e){ /* quota, private mode: not fatal */ }
+  }
+  function pickItems(sessions){
+    var out = {};
+    sessions.forEach(function(s){ if (data.items[s.id]) out[s.id] = data.items[s.id]; });
+    return out;
+  }
+  function loadMirror(){
+    try{
+      var raw = localStorage.getItem(MIRROR_KEY);
+      if (!raw) return false;
+      var m = JSON.parse(raw);
+      if (!m || !m.library || !m.library.length) return false;
+      data.focuses = m.focuses || []; data.games = m.games || [];
+      data.settings = m.settings || defaultSettings(); data.library = m.library;
+      data.sessions = m.sessions || []; data.items = m.items || {};
+      data.coaches = m.coaches || [];
+      staleMirror = (Date.now() - (m.at||0)) > 1000*60*60*24*10;
+      offline = true;
+      return true;
+    }catch(e){ return false; }
+  }
+
+  var refreshing = false;
+  async function refresh(){
+    if (!sb || !session || refreshing || generating) return;
+    var ae = document.activeElement;
+    if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT")) return;
+    refreshing = true;
+    try{ await loadAll(); render(); }
+    catch(e){ console.warn("refresh failed", e); }
+    finally{ refreshing = false; }
+  }
+
+  async function mutate(promiseFactory, quiet){
+    if (!session){ alert("You are logged out."); return false; }
+    try{
+      var r = await promiseFactory();
+      if (r && r.error) throw r.error;
+      await loadAll();
+      if (!quiet) render();
+      return r;
+    }catch(e){
+      alert("Couldn't save: " + friendlyDbError(e));
+      return false;
+    }
+  }
+  function friendlyDbError(e){
+    var m = (e && (e.message || e.msg)) || String(e);
+    if (/fetch|network|Failed to fetch/i.test(m)) return "no connection to the database.";
+    if (/sessions_slot_uniq/i.test(m)) return "there is already a training saved for that day and slot.";
+    if (/row-level security|permission/i.test(m)) return "your login is not set up as a coach yet. See SETUP.md step 4.";
+    return m;
+  }
+
+  // ==========================================================================
+  // ---------------------------- THE RULES ENGINE ----------------------------
+  // Owns the hard constraints: the clock, the no-repeat window, the safety
+  // rules, and the promise that pressing the button always produces a session.
+  // ==========================================================================
+
+  // Sessions that actually ran, newest first. A session marked "skipped" never
+  // happened, so it must not lock its sets out of the rotation.
+  function historyForRepeat(opts){
+    return data.sessions.filter(function(s){
+      if (s.group_level !== (opts.group || "advanced")) return false;
+      if (s.status === "skipped") return false;
+      if (opts.excludeId && s.id === opts.excludeId) return false;
+      if (s.session_date > opts.date) return false;      // planning ahead: ignore later sessions
+      return true;
+    });
+  }
+  function itemIdsOf(sessionId){
+    return (data.items[sessionId] || []).map(function(i){ return i.exercise_id; })
+      .filter(function(x){ return x != null; });
+  }
+  // how many sessions ago this exercise was last used (Infinity if never)
+  function sessionsSinceItem(hist, id){
+    for (var i=0;i<hist.length;i++) if (itemIdsOf(hist[i].id).indexOf(id) !== -1) return i;
+    return Infinity;
+  }
+  function sessionsSinceFamily(hist, fam){
+    if (!fam) return Infinity;
+    var byId = {}; data.library.forEach(function(x){ byId[x.id] = x; });
+    for (var i=0;i<hist.length;i++){
+      var ids = itemIdsOf(hist[i].id);
+      for (var j=0;j<ids.length;j++){
+        var it = byId[ids[j]];
+        if (it && it.family === fam) return i;
+      }
+    }
+    return Infinity;
+  }
+  function sessionsSinceFocus(hist, key){
+    for (var i=0;i<hist.length;i++) if (hist[i].focus_key === key) return i;
+    return Infinity;
+  }
+
+  function activeLibrary(group){
+    return data.library.filter(function(x){
+      return x.active !== false && (x.status || "active") === "active" &&
+             (x.group_level || "advanced") === group;
+    });
+  }
+
+  // --- focus choice: weighted, recency-penalised, honours avoid_after -------
+  function pickFocus(hist, group, forced){
+    var all = data.focuses.filter(function(f){
+      return f.active !== false && (f.group_level || "advanced") === group;
+    });
+    if (forced){
+      var f0 = all.filter(function(f){ return f.key === forced; })[0];
+      if (f0) return { focus:f0, relaxed:null };
+    }
+    var lastFocus = hist.length ? hist[0].focus_key : null;
+    var S = data.settings;
+    var pool = activeLibrary(group);
+    function scored(useCooldown, useAvoid){
+      var out = [];
+      all.forEach(function(f){
+        if (useAvoid && lastFocus && (f.avoid_after||[]).indexOf(lastFocus) !== -1) return;
+        var since = sessionsSinceFocus(hist, f.key);
+        if (useCooldown && since < (S.focus_cooldown_sessions || 2)) return;
+        // a focus with nothing left in the library is not a real option
+        var n = pool.filter(function(x){ return (x.focus_tags||[]).indexOf(f.key) !== -1; }).length;
+        if (n < 2) return;
+        var w = Number(f.rotation_weight || 1) * Math.min(since === Infinity ? 14 : since + 1, 14);
+        out.push({ f:f, w:w });
+      });
+      return out;
+    }
+    var cands = scored(true, true), relaxed = null;
+    if (!cands.length){ cands = scored(false, true); relaxed = "focus cooldown"; }
+    if (!cands.length){ cands = scored(false, false); relaxed = "focus rotation rules"; }
+    if (!cands.length) return { focus: all[0] || null, relaxed:"focus rotation rules" };
+    var total = cands.reduce(function(a,c){ return a + c.w; }, 0), r = Math.random() * total;
+    for (var i=0;i<cands.length;i++){ r -= cands[i].w; if (r <= 0) return { focus:cands[i].f, relaxed:relaxed }; }
+    return { focus:cands[cands.length-1].f, relaxed:relaxed };
+  }
+
+  // --- candidate choice ----------------------------------------------------
+  // The window is a function of how big the pool for that role actually is.
+  // A flat 6 sessions would exhaust the four cool-downs inside a fortnight,
+  // and the app would have nothing to show. Never returns null.
+  function effectiveWindow(item, roleCount, S){
+    var base = item.no_repeat_override != null ? item.no_repeat_override : (S.no_repeat_sessions || 6);
+    return Math.max(1, Math.min(base, Math.floor(roleCount * 0.5)));
+  }
+  function pickForRole(role, focusKey, hist, group, usedIds, usedFams, S, opts){
+    opts = opts || {};
+    var pool = activeLibrary(group).filter(function(x){ return x.role === role; });
+    // whole-session sets are their own pool, so the window is sized against
+    // the sets that could actually stand in for this one
+    pool = pool.filter(function(x){ return !!x.whole_body === !!opts.wantWholeBody; });
+    var roleTotal = pool.length;
+    // Hard exclusions. These are not preferences, so they apply at every tier
+    // including the guaranteed one: a second breath-restricted block, or one in
+    // the last position when they are most tired, is a safety call and not a
+    // variety call.
+    if (opts.noBreath) pool = pool.filter(function(x){
+      return ((x.safety_tags)||[]).indexOf("breath_control") === -1;
+    });
+    if (opts.noUnderwater) pool = pool.filter(function(x){
+      return ((x.safety_tags)||[]).indexOf("underwater") === -1;
+    });
+    if (opts.noMaxEffort) pool = pool.filter(function(x){
+      return ((x.safety_tags)||[]).indexOf("max_effort") === -1;
+    });
+    if (!pool.length) return null;
+    var roleCount = roleTotal;
+    var fresh = pool.filter(function(x){ return usedIds.indexOf(x.id) === -1; });
+    if (!fresh.length) fresh = pool;
+    // Sets that cannot land anywhere near this slot's metres are not candidates.
+    // A fixed 1,500 m set in an 850 m slot cannot be trimmed later, so letting
+    // it through here is what pushes the hour over.
+    if (opts.targetM){
+      // A set with a rep count can be trimmed later, so it only has to be in
+      // the right area. A fixed set cannot be trimmed at all, so whatever it
+      // measures is what the session gets, and it has to fit now. His
+      // 2-4-6-8-10-12-14-16 ladder is 1,800 m: room for it after a 5 minute
+      // cool-down, no room after a 10 minute game.
+      var loose = Math.max(opts.targetM * 1.45, opts.targetM + 150);
+      var tight = Math.max(opts.targetM * 1.12, opts.targetM + 120);
+      var fits = fresh.filter(function(x){
+        return achievable(x, opts.targetM) <= (rescalable(x) ? loose : tight);
+      });
+      if (fits.length) fresh = fits;
+    }
+    // a drill family used in the session immediately before is always out, at
+    // every tier: two catch-up variants on consecutive nights reads as a repeat
+    var prevFams = opts.prevFams || [];
+    if (prevFams.length){
+      var noPrev = fresh.filter(function(x){ return !x.family || prevFams.indexOf(x.family) === -1; });
+      if (noPrev.length) fresh = noPrev;
+    }
+
+    function ok(x, useWindow, useFamily){
+      if (useWindow && sessionsSinceItem(hist, x.id) < effectiveWindow(x, roleCount, S)) return false;
+      if (useFamily && usedFams.indexOf(x.family) !== -1 && x.family) return false;
+      if (useFamily && x.family &&
+          sessionsSinceFamily(hist, x.family) < (S.family_cooldown_sessions || 3)) return false;
+      return true;
+    }
+    function score(x){
+      var m = (x.focus_tags||[]).indexOf(focusKey) !== -1 ? 100 : 0;   // prefer, do not require
+      var since = sessionsSinceItem(hist, x.id);
+      var fit = 0;
+      if (opts.targetM){
+        // how badly this set misses the metres this slot needs
+        fit = -Math.abs(achievable(x, opts.targetM) - opts.targetM) / opts.targetM * 90;
+      }
+      return m + fit + Math.min(since === Infinity ? 20 : since, 20) + Math.random() * 3;
+    }
+    function best(list){
+      return list.slice().sort(function(a,b){ return score(b) - score(a); })[0];
+    }
+    // tier A: window + family + focus match
+    var t = fresh.filter(function(x){ return ok(x,true,true) && (x.focus_tags||[]).indexOf(focusKey) !== -1; });
+    if (t.length) return { item: best(t), relaxed:null };
+    // tier B: window + focus match, family relaxed
+    t = fresh.filter(function(x){ return ok(x,true,false) && (x.focus_tags||[]).indexOf(focusKey) !== -1; });
+    if (t.length) return { item: best(t), relaxed:null };
+    // tier C: window only, any focus
+    t = fresh.filter(function(x){ return ok(x,true,false); });
+    if (t.length) return { item: best(t), relaxed:null };
+    // tier D: guaranteed — least recently used in the role
+    t = fresh.slice().sort(function(a,b){
+      var sa = sessionsSinceItem(hist,a.id), sbb = sessionsSinceItem(hist,b.id);
+      return (sbb === Infinity ? 999 : sbb) - (sa === Infinity ? 999 : sa);
+    });
+    return { item: t[0], relaxed: ROLE_LABEL[role] || role };
+  }
+
+  // --- costing ------------------------------------------------------------
+  function costOne(distance, pace, S){
+    return Math.round(distance / 100 * pace) + (S.explain_seconds_per_set || 30);
+  }
+  function costBlocks(blocks, S){
+    var steady = 0, strong = 0, metres = 0;
+    blocks.forEach(function(b){
+      steady += costOne(b.distance_m, S.pace_steady_s_per_100, S);
+      strong += costOne(b.distance_m, S.pace_strong_s_per_100, S);
+      metres += b.distance_m;
+    });
+    return { steady_s:steady, strong_s:strong, metres:metres };
+  }
+
+  // Scale a block towards a metre target by whole reps, and rewrite the
+  // printed line to match. Never copy the library string once the reps change:
+  // a line that says "8 x 50" over a 300 m block is the bug that makes a coach
+  // stop trusting the app.
+  // A block may only be rescaled when its printed line is a single clean
+  // "N x D m" whose numbers match the stored rep count and rep distance.
+  // Anything else is a composite set of his ("10 x 50 legs / 8 x 50 legs / 6 x
+  // 50 legs", "1, 2, 3, 4 lengths") where rewriting the leading number would
+  // print nonsense. This guard is in the engine rather than the data so a set
+  // Claude adds later cannot reintroduce the bug.
+  function rescalable(it){
+    if (!it || !it.reps || !it.rep_distance_m || !it.structure) return false;
+    var groups = it.structure.match(/\d+\s*x/gi) || [];
+    if (groups.length !== 1) return false;
+    var lead = it.structure.match(/^\s*(\d+)\s*x\s*(\d+)?/i);
+    if (!lead || Number(lead[1]) !== it.reps) return false;
+    if (lead[2] && Number(lead[2]) !== it.rep_distance_m) return false;
+    return true;
+  }
+  // Nobody writes "23 x 25 m". A rep count has to read like something a coach
+  // would say out loud, and sprint and breath-restricted volume has a ceiling
+  // that has nothing to do with filling the clock.
+  function repCap(it){
+    var d = it.rep_distance_m || 50, tags = it.safety_tags || [], cap;
+    if (d <= 50) cap = 12;
+    else if (d <= 75) cap = 8;
+    else if (d <= 100) cap = 10;
+    else if (d <= 150) cap = 6;
+    else if (d <= 200) cap = 5;
+    else if (d <= 400) cap = 4;
+    else cap = 3;
+    if (tags.indexOf("max_effort") !== -1)     cap = Math.min(cap, Math.max(2, Math.floor(400 / d)));
+    if (tags.indexOf("underwater") !== -1)     cap = Math.min(cap, Math.max(2, Math.floor(400 / d)));
+    if (tags.indexOf("breath_control") !== -1) cap = Math.min(cap, Math.max(2, Math.floor(600 / d)));
+    return Math.max(1, cap);
+  }
+  // "1 x 200 m" reads badly. If the library set is a repeat set, keep it one.
+  function repFloor(it){ return (it.reps || 1) >= 2 ? 2 : 1; }
+  function clampReps(it, reps){
+    return Math.max(repFloor(it), Math.min(repCap(it), reps));
+  }
+
+  // The distance this item can actually land on for a given target. Used both
+  // to scale a chosen block and, more importantly, to choose a block that fits
+  // in the first place. Picking a set that suits the slot beats picking one and
+  // then hacking its rep count until the clock closes.
+  function achievable(it, targetM){
+    if (!rescalable(it)) return it.distance_m;
+    var reps = Math.max(1, Math.round(targetM / it.rep_distance_m));
+    if (reps > 1 && reps * it.rep_distance_m > targetM * 1.25) reps--;
+    return clampReps(it, reps) * it.rep_distance_m;
+  }
+  function scaleBlock(b, targetM){
+    var it = b.item;
+    if (!rescalable(it)) return;                             // fixed or composite set
+    var reps = Math.max(1, Math.round(targetM / it.rep_distance_m));
+    // rounding up can overshoot the share badly on coarse sets (800s, 300s),
+    // and an overshoot is what pushes the hour over
+    if (reps > 1 && reps * it.rep_distance_m > targetM * 1.25) reps--;
+    setReps(b, clampReps(it, reps));
+  }
+  function setReps(b, reps){
+    var it = b.item;
+    if (!rescalable(it)) return false;
+    reps = clampReps(it, reps);
+    if (b.reps === reps) return false;         // clamped to where we already are
+    b.reps = reps;
+    b.distance_m = reps * it.rep_distance_m;
+    b.rendered_text = renderLine(it, reps);
+    return true;
+  }
+  function renderLine(it, reps){
+    if (!rescalable(it) || reps === it.reps) return it.structure;
+    // guarded above, so the leading count is the rep count: rewrite just that
+    return it.structure.replace(/^\s*\d+\s*x\s*/i, reps + " x ");
+  }
+
+  // The library's variants are written against the library's own rep count. Once
+  // a set has been scaled to fit the hour, printing "Adv 1: 6 x 25" under a line
+  // that says "10 x 25" is worse than printing nothing. This runs once the
+  // numbers have settled, so the card, the copied text, the saved row and the
+  // prompt Claude sees all carry the same thing.
+  //
+  // For everything except the main set both halves swim the same distance and
+  // differ only in rest, which is how Vlad writes it and the only way seven
+  // people in one lane stay together. Only the main set gets a rep difference.
+  function finaliseAdv(blocks){
+    blocks.forEach(function(b){
+      var it = b.item;
+      if (!it) return;
+      var scaled = rescalable(it) && b.reps && b.reps !== it.reps;
+      if (!scaled){
+        b.adv1 = it.steady_variant || "";
+        b.adv2 = it.strong_variant || "";
+        return;
+      }
+      if (b.block_role !== "main_set"){
+        b.adv1 = ""; b.adv2 = "";                // the rest split does the work
+        return;
+      }
+      var d = it.rep_distance_m;
+      b.adv1 = b.reps > repFloor(it) ? (b.reps - 1) + " x " + d + " m" : "";
+      b.adv2 = b.reps < repCap(it) ? (b.reps + 1) + " x " + d + " m" : "";
+    });
+  }
+
+  // --- the skeleton -------------------------------------------------------
+  function buildSkeleton(opts){
+    var S = data.settings || defaultSettings();
+    var group = opts.group || "advanced";
+    var hist = historyForRepeat({ group:group, date:opts.date, excludeId:opts.excludeId });
+    var relaxations = [];
+
+    var fp = pickFocus(hist, group, opts.focusKey);
+    if (!fp.focus) return null;                      // library not seeded at all
+    if (fp.relaxed) relaxations.push("Reused a recent focus (" + fp.relaxed + "), the library is thin.");
+    var focus = fp.focus;
+
+    var names = FOCUS_ARCHETYPES[focus.key] || ["technique"];
+    var archName = names[Math.floor(Math.random()*names.length)];
+    var arch = ARCHETYPES[archName] || ARCHETYPES.technique;
+    var isBigSet = archName === "bigset";
+
+    var ending = opts.ending || S.default_ending || "cooldown";
+    var endMin = ending === "game" ? (S.game_minutes||10) : (S.cooldown_minutes||5);
+    var mainSeconds = ((S.total_minutes||60) - (S.warmup_minutes||10) - endMin) * 60;
+
+    // metre target the clock can actually hold, clamped to his stated range
+    var explain = (S.explain_seconds_per_set||30) * arch.length;
+    var byClock = Math.round((mainSeconds - explain) / (S.pace_steady_s_per_100||150) * 100 * 0.99);
+    var targetM = Math.max(S.main_min_m||1500, Math.min(S.main_max_m||1800, byClock));
+
+    // families used in the session immediately before, so near-identical drills
+    // never land two nights running
+    var prevFams = [];
+    if (hist.length){
+      var byIdF = {}; data.library.forEach(function(x){ byIdF[x.id] = x; });
+      itemIdsOf(hist[0].id).forEach(function(id){
+        var it = byIdF[id]; if (it && it.family) prevFams.push(it.family);
+      });
+    }
+
+    // Running over is the thing that matters: the next group is already on the
+    // deck. Finishing a few minutes early is fine, he fills it by talking.
+    var lo = mainSeconds - 240, hi = mainSeconds;
+
+    // Pick one item per block for a given metre target, then trim reps until the
+    // clock closes. Some of his sets are a fixed distance that cannot be
+    // trimmed, so a single pass can still land long. When it does, we run the
+    // whole thing again against a corrected target rather than hack the blocks
+    // apart, and keep whichever attempt came closer.
+    function assemble(target){
+      var usedIds = [], usedFams = [], blocks = [], notes = [];
+      var breathUsed = 0, uwUsed = 0, maxEffortM = 0;
+      for (var i=0;i<arch.length;i++){
+        var slot = arch[i];
+        var isLast = (i === arch.length - 1);
+        var got = pickForRole(slot.role, focus.key, hist, group, usedIds, usedFams, S, {
+          prevFams: prevFams,
+          targetM: target * slot.share,
+          wantWholeBody: isBigSet && slot.role === "main_set",
+          noBreath: breathUsed >= (S.max_breath_blocks || 1) || isLast,
+          noUnderwater: uwUsed >= (S.max_underwater_blocks || 2),
+          // no maximum effort on dead legs, and no more than 400 m of it in
+          // one session however the blocks fall
+          // one flat-out block per session. A sprint day has a sprint set,
+          // not two.
+          noMaxEffort: maxEffortM > 0 ||
+                       (i > 0 && blocks.length &&
+                        blocks[blocks.length-1].distance_m >= target * 0.4)
+        });
+        if (!got || !got.item) continue;                     // role empty in the library
+        if (got.relaxed) notes.push("Repeated a " + got.relaxed + " sooner than usual, that role is thin.");
+        var stags = got.item.safety_tags || [];
+        if (stags.indexOf("breath_control") !== -1) breathUsed++;
+        if (stags.indexOf("underwater") !== -1) uwUsed++;
+        usedIds.push(got.item.id);
+        if (got.item.family) usedFams.push(got.item.family);
+        var b = {
+          block_role: slot.role, item: got.item, share: slot.share,
+          reps: got.item.reps, distance_m: got.item.distance_m,
+          rendered_text: got.item.structure
+        };
+        scaleBlock(b, target * slot.share);
+        if (stags.indexOf("max_effort") !== -1) maxEffortM += b.distance_m;
+        blocks.push(b);
+      }
+      if (!blocks.length) return null;
+
+      // Coarse sets (his 800s, 400s and 300s) cannot land exactly on the target,
+      // so a naive trim-then-top-up loop flips between too long and too short
+      // forever and exits wherever it happens to be. Remember the closest
+      // arrangement seen and fall back to it. Running over is weighted three
+      // times as heavily as finishing early, because only one of those two is
+      // actually a problem on the pool deck.
+      function err(c){
+        if (c.steady_s > hi) return (c.steady_s - hi) * 3;
+        if (c.steady_s < lo) return lo - c.steady_s;
+        return 0;
+      }
+      // Greedy best move. At each step, try adding and removing one rep from
+      // every block that can be rescaled, and take whichever single change gets
+      // closest to the band. Always adjusting the block furthest from its own
+      // share sounds sensible but gets stuck in a two-step cycle: it trims the
+      // main set, goes under, puts the rep straight back, and never tries the
+      // pull set that would have closed the gap.
+      var moves = 0;
+      for (var pass=0; pass<60; pass++){
+        var e0 = err(costBlocks(blocks, S));
+        if (e0 === 0) break;
+        var bestMove = null, bestE = e0;
+        for (var bi=0; bi<blocks.length; bi++){
+          var blk = blocks[bi];
+          if (!rescalable(blk.item)) continue;
+          var cur = blk.reps || blk.item.reps;
+          [cur - 1, cur + 1].forEach(function(cand){
+            if (cand < 1) return;
+            var keep = { reps: blk.reps, d: blk.distance_m, t: blk.rendered_text };
+            setReps(blk, cand);
+            var e1 = err(costBlocks(blocks, S));
+            blk.reps = keep.reps; blk.distance_m = keep.d; blk.rendered_text = keep.t;
+            if (e1 < bestE){ bestE = e1; bestMove = { blk: blk, reps: cand }; }
+          });
+        }
+        if (!bestMove) break;                  // no single change improves things
+        setReps(bestMove.blk, bestMove.reps);
+        moves++;
+      }
+      return { blocks: blocks, notes: notes, cost: costBlocks(blocks, S), usedIds: usedIds, usedFams: usedFams };
+    }
+
+    var att = assemble(targetM);
+    if (!att) return null;
+    if (att.cost.steady_s > hi){
+      // scale the target by how far over we landed, and try once more
+      var corrected = Math.round(targetM * (mainSeconds - explain) /
+                                 Math.max(1, att.cost.steady_s - explain));
+      var att2 = assemble(Math.max(600, corrected));
+      if (att2 && Math.abs(att2.cost.steady_s - mainSeconds) < Math.abs(att.cost.steady_s - mainSeconds))
+        att = att2;
+    }
+    var blocks = att.blocks, usedIds = att.usedIds, usedFams = att.usedFams;
+    relaxations = relaxations.concat(att.notes);
+
+    // Some of his whole-session sets are a fixed distance that comes in under
+    // the hour on its own (the 1,500 m legs/arms/stroke day is a 53 minute
+    // session). Rather than hand him ten minutes of dead time, top it up with
+    // one more block sized to whatever is left.
+    // Keep topping up until the gap is closed or there is nothing left to add.
+    // One block was not enough: a 1,050 m whole-session set plus a single fixed
+    // 300 m opener still leaves a quarter of the hour empty.
+    var fillRoles = ["activation","technique_drill","kick_set","pull_set","skill_set","turns"];
+    for (var round=0; round<fillRoles.length; round++){
+      var gap = lo - att.cost.steady_s;
+      if (gap <= 60) break;
+      var gapM = Math.round(gap / (S.pace_steady_s_per_100||150) * 100);
+      var haveRoles = blocks.map(function(b){ return b.block_role; });
+      var added = false;
+      for (var fr=0; fr<fillRoles.length && !added; fr++){
+        if (haveRoles.indexOf(fillRoles[fr]) !== -1) continue;
+        var fill = pickForRole(fillRoles[fr], focus.key, hist, group, usedIds, usedFams, S, {
+          prevFams: prevFams, targetM: gapM, wantWholeBody: false,
+          noBreath: true, noUnderwater: true, noMaxEffort: true
+        });
+        if (!fill || !fill.item) continue;
+        var fb = { block_role: fillRoles[fr], item: fill.item, share: gapM / targetM,
+                   reps: fill.item.reps, distance_m: fill.item.distance_m,
+                   rendered_text: fill.item.structure };
+        scaleBlock(fb, gapM);
+        // trim it back rather than overshoot the hour
+        while (costBlocks(blocks.concat([fb]), S).steady_s > hi &&
+               fb.reps > 1 && setReps(fb, fb.reps - 1)) { /* keep trimming */ }
+        if (costBlocks(blocks.concat([fb]), S).steady_s > hi) continue;   // no room for it
+        if (fillRoles[fr] === "activation") blocks.unshift(fb);           // an opener goes first
+        else blocks.push(fb);
+        usedIds.push(fill.item.id);
+        if (fill.item.family) usedFams.push(fill.item.family);
+        att.cost = costBlocks(blocks, S);
+        added = true;
+      }
+      if (!added) break;
+    }
+
+    // the ending
+    var endBlock = null;
+    if (ending === "game"){
+      var g = pickGame(hist, S);
+      if (g) endBlock = { block_role:"game", game:g, rendered_text:g.name, distance_m:0,
+                          cue:g.why_it_is_useful, watch_for:g.how_it_works };
+    }
+    if (!endBlock){
+      var cd = pickForRole("cooldown", focus.key, hist, group, usedIds, usedFams, S);
+      if (cd && cd.item){
+        endBlock = { block_role:"cooldown", item:cd.item, reps:cd.item.reps,
+                     distance_m:cd.item.distance_m, rendered_text:cd.item.structure };
+        if (ending === "game") ending = "cooldown";
+      }
+    }
+
+    finaliseAdv(blocks);
+
+    var cost = costBlocks(blocks, S);
+    var totalM = cost.metres + (endBlock ? endBlock.distance_m : 0);
+    var minutes = Math.round(((S.warmup_minutes||10)*60 + cost.steady_s + endMin*60) / 60);
+
+    var sk = {
+      date: opts.date, slot: opts.slot, group_level: group,
+      focus_key: focus.key, focus: focus, ending: ending,
+      title: focus.name, goal: focus.goal_sentence,
+      blocks: blocks, endBlock: endBlock,
+      warmup_minutes: S.warmup_minutes || 10,
+      planned_total_m: totalM, planned_minutes: minutes,
+      steady_s: cost.steady_s, strong_s: cost.strong_s,
+      relaxations: relaxations, warnings: [], engine:"rules"
+    };
+    var v = validate(sk, S);
+    sk.warnings = v.warnings;
+    return sk;
+  }
+
+  function pickGame(hist, S){
+    var pool = data.games.filter(function(g){
+      if (g.active === false) return false;
+      var tags = g.safety_tags || [];
+      // a game is never allowed to be a breath-holding or underwater contest
+      return tags.indexOf("breath_control") === -1 && tags.indexOf("underwater") === -1;
+    });
+    if (!pool.length) return null;
+    var recent = {};
+    hist.slice(0, 4).forEach(function(s){
+      (data.items[s.id]||[]).forEach(function(i){ if (i.game_id) recent[i.game_id] = true; });
+    });
+    var fresh = pool.filter(function(g){ return !recent[g.id]; });
+    var list = fresh.length ? fresh : pool;
+    return list[Math.floor(Math.random()*list.length)];
+  }
+
+  // --- validators: coaching sense and safety -----------------------------
+  function tagsOf(b){ return (b.item && b.item.safety_tags) || (b.game && b.game.safety_tags) || []; }
+  function validate(sk, S){
+    S = S || data.settings || defaultSettings();
+    var w = [], all = sk.blocks.concat(sk.endBlock ? [sk.endBlock] : []);
+
+    // clock
+    var endMin = sk.ending === "game" ? (S.game_minutes||10) : (S.cooldown_minutes||5);
+    var mainSeconds = ((S.total_minutes||60) - (S.warmup_minutes||10) - endMin) * 60;
+    if (!isFinite(sk.steady_s)) w.push("Could not work out how long this takes. Check the pace settings.");
+    else if (sk.steady_s > mainSeconds + 60)
+      w.push("Runs about " + Math.round((sk.steady_s - mainSeconds)/60) + " min long for the slower swimmers.");
+    else if (sk.steady_s < mainSeconds - 300)
+      w.push("Runs about " + Math.round((mainSeconds - sk.steady_s)/60) + " min short, you have room for more.");
+
+    // paddles: shoulder load
+    var paddleM = 0;
+    all.forEach(function(b){ if (((b.item&&b.item.equipment)||[]).indexOf("paddles") !== -1) paddleM += b.distance_m; });
+    if (paddleM > (S.max_paddle_m||700)) w.push("That is " + paddleM + " m on paddles. Cut one paddle block.");
+    // paddles never in the first working block, shoulders are not warm yet
+    if (sk.blocks.length > 1 && ((sk.blocks[0].item&&sk.blocks[0].item.equipment)||[]).indexOf("paddles") !== -1)
+      w.push("Paddles in the first block, before the shoulders are warm. Move them later.");
+
+    // breath-restricted work: at most one block, and never the last one, when
+    // they are most tired
+    var breathIdx = [];
+    sk.blocks.forEach(function(b,i){ if (tagsOf(b).indexOf("breath_control") !== -1) breathIdx.push(i); });
+    if (breathIdx.length > (S.max_breath_blocks||1))
+      w.push("Two breath-restricted blocks in one session. Keep it to one.");
+    if (breathIdx.length && breathIdx[breathIdx.length-1] === sk.blocks.length-1)
+      w.push("Breath-restricted work is the last block, when they are most tired. Move it earlier.");
+
+    // underwater segments: fine, but not the whole session
+    var uw = all.filter(function(b){ return tagsOf(b).indexOf("underwater") !== -1; }).length;
+    if (uw > (S.max_underwater_blocks||2))
+      w.push(uw + " underwater blocks. Keep it to " + (S.max_underwater_blocks||2) + ".");
+
+    // maximum effort should not land on dead legs
+    sk.blocks.forEach(function(b,i){
+      if (i === 0) return;
+      var prev = sk.blocks[i-1];
+      if (tagsOf(b).indexOf("max_effort") !== -1 && prev.distance_m >= sk.planned_total_m * 0.4)
+        w.push("Maximum effort straight after the longest set. They will not be able to sprint.");
+    });
+
+    // three kick blocks is a lot even on a legs day
+    if (sk.blocks.filter(function(b){ return b.block_role === "kick_set"; }).length > 2)
+      w.push("Three leg blocks in one session is a lot of kicking.");
+
+    // every block needs something to say
+    all.forEach(function(b){
+      var cue = b.cue || (b.item && b.item.cue);
+      if (!cue) w.push("One block has no coaching cue.");
+    });
+    return { warnings: w };
+  }
+
+  // ==========================================================================
+  // the AI layer: Claude writes the words, the engine keeps the numbers
+  // ==========================================================================
+  function skeletonForAi(sk){
+    return {
+      date: sk.date, slot: sk.slot, day: DAYS[isoDow(sk.date)],
+      focus: { key: sk.focus.key, name: sk.focus.name, goal_sentence: sk.focus.goal_sentence,
+               what_it_trains: sk.focus.what_it_trains },
+      ending: sk.ending,
+      warmup_minutes: sk.warmup_minutes,
+      planned_total_m: sk.planned_total_m, planned_minutes: sk.planned_minutes,
+      sets: sk.blocks.map(function(b,i){
+        return { index:i, block_role:b.block_role, code:b.item.code, name:b.item.name,
+                 structure:b.rendered_text, distance_m:b.distance_m,
+                 rest:b.item.rest, rest_adv1:b.item.rest_adv1, rest_adv2:b.item.rest_adv2,
+                 effort:b.item.effort, equipment:b.item.equipment, strokes:b.item.strokes,
+                 cue:b.item.cue, watch_for:b.item.watch_for,
+                 adv1:b.item.steady_variant, adv2:b.item.strong_variant };
+      }),
+      ending_block: sk.endBlock ? {
+        block_role: sk.endBlock.block_role,
+        name: sk.endBlock.game ? sk.endBlock.game.name : sk.endBlock.item.name,
+        structure: sk.endBlock.rendered_text,
+        how_it_works: sk.endBlock.game ? sk.endBlock.game.how_it_works : null,
+        distance_m: sk.endBlock.distance_m
+      } : null
+    };
+  }
+
+  async function callAi(action, payload){
+    if (!sb || !session) return { ok:false, code:"not_signed_in" };
+    var ctrl = new AbortController();
+    var timer = setTimeout(function(){ ctrl.abort(); }, AI_TIMEOUT_MS);
+    try{
+      var r = await fetch(cfg.url.replace(/\/$/,"") + "/functions/v1/" + AI_FN, {
+        method:"POST", signal: ctrl.signal,
+        headers:{ "Content-Type":"application/json",
+                  "Authorization":"Bearer " + session.access_token,
+                  "apikey": cfg.anonKey },
+        body: JSON.stringify({ action: action, payload: payload })
+      });
+      var body = null;
+      try{ body = await r.json(); }catch(e){ body = null; }
+      if (!r.ok || !body || typeof body.ok !== "boolean")
+        return { ok:false, code: r.status === 404 ? "not_deployed" : ((body && body.code) || "upstream"), status:r.status };
+      return body;
+    }catch(e){
+      return { ok:false, code: e && e.name === "AbortError" ? "timeout" : "offline" };
+    }finally{ clearTimeout(timer); }
+  }
+
+  var BANNED = ["delve","unlock","leverage","embark","navigate","comprehensive",
+                "game-changer","game changer","in addition","furthermore","moreover","additionally"];
+  function prosePasses(s){
+    if (!s) return true;
+    if (/[—–]/.test(s)) return false;                       // no em or en dashes, ever
+    var low = " " + s.toLowerCase() + " ";
+    for (var i=0;i<BANNED.length;i++) if (low.indexOf(" " + BANNED[i]) !== -1) return false;
+    return true;
+  }
+  // Claude may rewrite the words. It may not touch the numbers.
+  function applyAi(sk, ai){
+    if (!ai || !Array.isArray(ai.sets) || ai.sets.length !== sk.blocks.length) return "shape";
+    for (var i=0;i<ai.sets.length;i++){
+      var a = ai.sets[i], b = sk.blocks[i];
+      if (Number(a.distance_m) !== Number(b.distance_m)) return "metres";
+      if (!prosePasses(a.cue) || !prosePasses(a.watch_for)) return "prose";
+    }
+    if (!prosePasses(ai.goal) || !prosePasses(ai.title)) return "prose";
+    sk.title = ai.title || sk.title;
+    sk.goal  = ai.goal  || sk.goal;
+    ai.sets.forEach(function(a,i){
+      var b = sk.blocks[i];
+      if (a.structure) b.rendered_text = a.structure;
+      b.cue = a.cue; b.watch_for = a.watch_for;
+      b.adv1 = a.adv1; b.adv2 = a.adv2;
+    });
+    if (sk.endBlock && ai.ending){
+      sk.endBlock.rendered_text = ai.ending.structure || sk.endBlock.rendered_text;
+      sk.endBlock.cue = ai.ending.cue || sk.endBlock.cue;
+      sk.endBlock.watch_for = ai.ending.how_to_run || sk.endBlock.watch_for;
+    }
+    sk.engine = "ai";
+    // re-validate after the rewrite: the engine has the last word
+    var v = validate(sk, data.settings);
+    sk.warnings = v.warnings;
+    return null;
+  }
+
+  var FALLBACK_NOTE = {
+    timeout:"Claude took too long, so this one is written straight from the library.",
+    offline:"No connection, so this one is written straight from the library.",
+    not_deployed:"The AI function is not deployed yet (SETUP.md step 9). Written from the library.",
+    no_key:"The Anthropic key is not set in Supabase yet (SETUP.md step 8). Written from the library.",
+    no_service_key:"The function cannot reach the database. Add a secret named SB_SECRET_KEY with your Supabase Secret key (SETUP.md step 9). Written from the library.",
+    no_credit:"The Anthropic account is out of credit. Written from the library.",
+    rate_limited:"Claude is busy. Written from the library. Press generate again in a minute for the AI version.",
+    daily_cap:"That is a lot of generations today, so the AI is paused. Written from the library.",
+    not_a_coach:"Your login is not set up as a coach yet (SETUP.md step 4). Written from the library.",
+    shape:"Claude sent something the wrong shape, so this one is written from the library.",
+    metres:"Claude tried to change the distances, so this one is written from the library.",
+    prose:"Claude used wording you have banned, so this one is written from the library."
+  };
+
+  // ==========================================================================
+  // generate
+  // ==========================================================================
+  async function generateToday(opts){
+    if (generating) return;
+    var existing = data.sessions.filter(function(s){
+      return s.session_date === opts.date && (s.slot||"other") === (opts.slot||"other") &&
+             s.group_level === (opts.group||"advanced");
+    })[0];
+    if (existing && !opts.replace){
+      draft = hydrate(existing);
+      view.name = "today"; render();
+      alert("There is already a training saved for " + fmtDayDate(opts.date) + ". Showing that one.\n\nUse Regenerate if you want a new one.");
+      return;
+    }
+
+    generating = true; render();
+    try{
+      var sk = buildSkeleton(opts);
+      if (!sk){
+        generating = false;
+        draft = null; render();
+        alert("The library has not been loaded yet. Run supabase-schema.sql (SETUP.md step 2), then reload.");
+        return;
+      }
+      sk.fallbackNote = null;
+
+      if (!offline){
+        var res = await callAi("write_session", {
+          skeleton: skeletonForAi(sk),
+          recent: recentForPrompt(sk.date, sk.group_level),
+          style_samples: null      // the function pulls these itself
+        });
+        if (res.ok && res.session){
+          var why = applyAi(sk, res.session);
+          if (why) sk.fallbackNote = FALLBACK_NOTE[why] || FALLBACK_NOTE.shape;
+        } else {
+          sk.fallbackNote = FALLBACK_NOTE[res.code] || "Claude was not reachable, so this one is written from the library.";
+          if (res.code === "not_signed_in"){ await sb.auth.signOut(); generating = false; render(); return; }
+        }
+      } else {
+        sk.fallbackNote = FALLBACK_NOTE.offline;
+      }
+
+      draft = sk;
+      generating = false;
+      view.name = "today"; render();
+      if (!offline) await saveDraft(existing ? existing.id : null);
+    }catch(e){
+      generating = false;
+      console.error(e);
+      render();
+      alert("Something went wrong generating that: " + (e.message || e));
+    }
+  }
+
+  function recentForPrompt(date, group){
+    var hist = historyForRepeat({ group:group, date:date });
+    return hist.slice(0, 8).map(function(s){
+      return { date:s.session_date, focus:s.focus_key, title:s.title,
+               sets:(data.items[s.id]||[]).map(function(i){ return i.rendered_text; }) };
+    });
+  }
+
+  // ==========================================================================
+  // save / load sessions
+  // ==========================================================================
+  async function saveDraft(replaceId){
+    if (!draft || !sb || !session) return false;
+    var sk = draft;
+    var row = {
+      session_date: sk.date, slot: sk.slot || null, group_level: sk.group_level,
+      coach_id: session.user.id, focus_key: sk.focus_key,
+      title: sk.title, goal: sk.goal, ending: sk.ending,
+      planned_total_m: sk.planned_total_m, planned_minutes: sk.planned_minutes,
+      status: sk.status || "planned", engine: sk.engine,
+      warnings: sk.warnings || [],
+      generation_inputs: { archetype_roles: sk.blocks.map(function(b){ return b.block_role; }),
+                           relaxations: sk.relaxations || [],
+                           steady_s: sk.steady_s, strong_s: sk.strong_s }
+    };
+    busy = true; render();
+    try{
+      var sid = replaceId || sk.id;
+      if (sid){
+        var up = await sb.from("tr_sessions").update(row).eq("id", sid);
+        if (up.error) throw up.error;
+        var del = await sb.from("tr_session_items").delete().eq("session_id", sid);
+        if (del.error) throw del.error;
+      } else {
+        var ins = await sb.from("tr_sessions").insert(row).select("id").single();
+        if (ins.error) throw ins.error;
+        sid = ins.data.id;
+      }
+      var items = blocksToItems(sk, sid);
+      if (items.length){
+        var ri = await sb.from("tr_session_items").insert(items);
+        if (ri.error) throw ri.error;
+      }
+      sk.id = sid;
+      await bumpUsage(sk);
+      await loadAll();
+      draft = hydrate(data.sessions.filter(function(s){ return s.id === sid; })[0]) || draft;
+      draft.fallbackNote = sk.fallbackNote;
+      busy = false; render();
+      return true;
+    }catch(e){
+      busy = false; render();
+      alert("Couldn't save that training: " + friendlyDbError(e));
+      return false;
+    }
+  }
+
+  function blocksToItems(sk, sid){
+    var S = data.settings || defaultSettings(), out = [], pos = 0;
+    out.push({ session_id:sid, position:pos++, block_role:"warmup",
+      label:"Warm-up", rendered_text:"Warm-up (" + sk.warmup_minutes + " min): easy swim, own pace. Loosen up, no exercises.",
+      distance_m:0, cue:null, watch_for:null });
+    sk.blocks.forEach(function(b){
+      out.push({
+        session_id:sid, position:pos++, block_role:b.block_role,
+        exercise_id: b.item ? b.item.id : null,
+        label: ROLE_LABEL[b.block_role] || b.block_role,
+        rendered_text: b.rendered_text,
+        distance_m: b.distance_m,
+        est_seconds_steady: costOne(b.distance_m, S.pace_steady_s_per_100, S),
+        est_seconds_strong: costOne(b.distance_m, S.pace_strong_s_per_100, S),
+        rest_adv1: b.item ? b.item.rest_adv1 || b.item.rest : null,
+        rest_adv2: b.item ? b.item.rest_adv2 || b.item.rest : null,
+        cue: b.cue || (b.item && b.item.cue) || null,
+        watch_for: b.watch_for || (b.item && b.item.watch_for) || null,
+        steady_variant: b.adv1 != null ? b.adv1 : (b.item && b.item.steady_variant) || null,
+        strong_variant: b.adv2 != null ? b.adv2 : (b.item && b.item.strong_variant) || null
+      });
+    });
+    if (sk.endBlock){
+      var e = sk.endBlock;
+      out.push({ session_id:sid, position:pos++, block_role:e.block_role,
+        exercise_id: e.item ? e.item.id : null, game_id: e.game ? e.game.id : null,
+        label: ROLE_LABEL[e.block_role] || e.block_role,
+        rendered_text: e.rendered_text, distance_m: e.distance_m || 0,
+        cue: e.cue || (e.item && e.item.cue) || null,
+        watch_for: e.watch_for || (e.item && e.item.watch_for) || null,
+        steady_variant: (e.item && e.item.steady_variant) || null,
+        strong_variant: (e.item && e.item.strong_variant) || null });
+    }
+    return out;
+  }
+
+  async function bumpUsage(sk){
+    var today = sk.date;
+    var ids = sk.blocks.map(function(b){ return b.item && b.item.id; }).filter(Boolean);
+    if (sk.endBlock && sk.endBlock.item) ids.push(sk.endBlock.item.id);
+    for (var i=0;i<ids.length;i++){
+      var cur = data.library.filter(function(x){ return x.id === ids[i]; })[0];
+      await sb.from("tr_exercises").update({
+        times_used: (cur ? cur.times_used || 0 : 0) + 1, last_used_on: today
+      }).eq("id", ids[i]);
+    }
+    if (sk.endBlock && sk.endBlock.game){
+      var g = sk.endBlock.game;
+      await sb.from("tr_games").update({ times_used:(g.times_used||0)+1, last_used_on:today }).eq("id", g.id);
+    }
+  }
+
+  // turn a saved session row back into the on-screen shape
+  function hydrate(row){
+    if (!row) return null;
+    var items = (data.items[row.id] || []).slice().sort(function(a,b){ return a.position - b.position; });
+    var focus = data.focuses.filter(function(f){ return f.key === row.focus_key; })[0] ||
+                { key:row.focus_key, name:row.title, goal_sentence:row.goal };
+    var warm = items.filter(function(i){ return i.block_role === "warmup"; })[0];
+    var end  = items.filter(function(i){ return i.block_role === "cooldown" || i.block_role === "game"; })[0];
+    var mid  = items.filter(function(i){
+      return i.block_role !== "warmup" && i.block_role !== "cooldown" && i.block_role !== "game";
+    });
+    function toBlock(i){
+      return { block_role:i.block_role, rendered_text:i.rendered_text, distance_m:i.distance_m,
+               cue:i.cue, watch_for:i.watch_for, adv1:i.steady_variant, adv2:i.strong_variant,
+               rest_adv1:i.rest_adv1, rest_adv2:i.rest_adv2, done:i.done, itemId:i.id,
+               item: data.library.filter(function(x){ return x.id === i.exercise_id; })[0] || null,
+               game: data.games.filter(function(g){ return g.id === i.game_id; })[0] || null };
+    }
+    return {
+      id:row.id, date:row.session_date, slot:row.slot, group_level:row.group_level,
+      focus_key:row.focus_key, focus:focus, ending:row.ending,
+      title:row.title, goal:row.goal, status:row.status,
+      difficulty_rating:row.difficulty_rating, note:row.note,
+      coach_id:row.coach_id, engine:row.engine, warnings:row.warnings || [],
+      warmup_minutes: warm ? (data.settings.warmup_minutes||10) : (data.settings.warmup_minutes||10),
+      blocks: mid.map(toBlock), endBlock: end ? toBlock(end) : null,
+      planned_total_m:row.planned_total_m, planned_minutes:row.planned_minutes,
+      steady_s:(row.generation_inputs && row.generation_inputs.steady_s) || null,
+      relaxations:(row.generation_inputs && row.generation_inputs.relaxations) || [],
+      saved:true
+    };
+  }
+
+  // ==========================================================================
+  // export
+  // ==========================================================================
+  function asPlainText(sk){
+    var L = [];
+    L.push("Advanced adults, " + fmtDayDate(sk.date) + (sk.slot && sk.slot !== "other" ? ", " + slotLabel(sk.slot).split(" ")[1] : ""));
+    L.push("Goal: " + sk.goal);
+    L.push("");
+    L.push("Warm-up (" + (sk.warmup_minutes||10) + " min)");
+    L.push("  Easy swim, own pace. Loosen up, no exercises.");
+    L.push("");
+    sk.blocks.forEach(function(b){
+      var head = (ROLE_LABEL[b.block_role] || b.block_role) + ": " + b.rendered_text;
+      var rest = restText(b);
+      if (rest) head += ", " + rest;
+      L.push(head);
+      var cue = b.cue || (b.item && b.item.cue);
+      if (cue) L.push("  Cue: " + cue);
+      var a1 = advText(b,1), a2 = advText(b,2);
+      if (a1 || a2) L.push("  " + (a1 ? "Adv 1: " + a1 : "") + (a1 && a2 ? "   " : "") + (a2 ? "Adv 2: " + a2 : ""));
+      L.push("");
+    });
+    if (sk.endBlock){
+      var e = sk.endBlock;
+      L.push((e.block_role === "game" ? "Game (10 min)" : "Cool-down (5 min)") + ": " + e.rendered_text);
+      var w = e.watch_for || (e.game && e.game.how_it_works);
+      if (w) L.push("  " + w);
+      L.push("");
+    }
+    L.push("Total " + fmtM(sk.planned_total_m || 0) + ", planned " + (sk.planned_minutes||60) + " min");
+    return L.join("\n");
+  }
+  function restText(b){
+    var r1 = b.rest_adv1 || (b.item && (b.item.rest_adv1 || b.item.rest));
+    var r2 = b.rest_adv2 || (b.item && (b.item.rest_adv2 || b.item.rest));
+    if (r1 && r2 && r1 !== r2) return r1 + " adv 1 | " + r2 + " adv 2";
+    return r1 || r2 || "";
+  }
+  // The library's variants are written against the library's own rep count. Once
+  // the engine has scaled a set to fit the hour, printing "Adv 1: 6 x 25" under
+  // a line that says "10 x 25" is worse than printing nothing, so in that case
+  // the variants are derived from the reps actually on the card.
+  //
+  // For everything except the main set, both halves swim the same distance and
+  // differ only in rest, which is how Vlad writes it and the only way seven
+  // people in one lane stay together. Only the main set gets a rep difference.
+  function advText(b, which){
+    if (which === 1) return b.adv1 != null ? b.adv1 : (b.item && b.item.steady_variant) || "";
+    return b.adv2 != null ? b.adv2 : (b.item && b.item.strong_variant) || "";
+  }
+  function copyText(t){
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(function(){ toast("Copied. Paste it into Notes or WhatsApp."); },
+        function(){ fallbackCopy(t); });
+    } else fallbackCopy(t);
+  }
+  function fallbackCopy(t){
+    var ta = h("textarea", { style:{position:"fixed",top:"-1000px"} }); ta.value = t;
+    document.body.append(ta); ta.select();
+    try{ document.execCommand("copy"); toast("Copied."); }catch(e){ alert(t); }
+    ta.remove();
+  }
+  var toastEl = null;
+  function toast(msg){
+    if (toastEl) toastEl.remove();
+    toastEl = h("div",{ class:"banner ok", style:{position:"fixed",left:"50%",transform:"translateX(-50%)",
+      bottom:"24px",zIndex:"99",maxWidth:"90%",boxShadow:"0 2px 10px rgba(0,0,0,.15)"} }, msg);
+    document.body.append(toastEl);
+    setTimeout(function(){ if (toastEl){ toastEl.remove(); toastEl = null; } }, 2600);
+  }
+
+  // ==========================================================================
+  // auth
+  // ==========================================================================
+  async function signIn(email, password){
+    loginError = "";
+    var r = await sb.auth.signInWithPassword({ email:String(email||"").trim(), password:password });
+    if (r.error){ loginError = r.error.message; render(); }
+  }
+  async function signOut(){
+    await sb.auth.signOut();
+    data = { focuses:[], library:[], games:[], sessions:[], items:{}, settings:null, coaches:[] };
+    draft = null; notCoach = false;
+  }
+  function renderWho(){
+    clear(WHO);
+    if (!sb || !session) return;
+    var name = coachRow ? coachRow.display_name : session.user.email;
+    WHO.append(
+      h("span",{class:"small muted",style:{marginRight:"8px"}}, name),
+      h("button",{class:"ghost small", onclick:signOut }, "Log out")
+    );
+  }
+
+  // ==========================================================================
+  // render
+  // ==========================================================================
+  function nav(n){ view.name = n; render(); }
+
+  function render(){
+    renderWho();
+    var pool = document.getElementById("pool");
+    if (pool) pool.remove();
+    clear(APP);
+
+    if (!configured){
+      APP.append(h("div",{class:"card stack"},
+        h("h2",null,"Almost there, needs setup"),
+        h("p",{class:"muted"},"This app is not connected to its database yet. Open ",
+          h("b",null,"config.js"), " and fill in your Supabase project URL and anon key (see ",
+          h("b",null,"SETUP.md"), ").")
+      ));
+      return;
+    }
+    if (!window.supabase){
+      APP.append(h("div",{class:"card"},
+        h("p",null,"Couldn't load the database library. Check your internet connection and reload.")));
+      return;
+    }
+    if (!session) return renderLogin();
+    if (notCoach) return renderNotCoach();
+
+    if (view.name === "pool" && draft) return renderPool();
+
+    if (offline) APP.append(h("div",{class:"banner"},
+      staleMirror ? "No connection, and the copy on this phone is more than ten days old. Generate will still work but check the sets."
+                  : "No connection. Working from the copy saved on this phone. Nothing will be saved until you are back online."));
+
+    APP.append(h("nav",{class:"tabs"},
+      [["today","Today"],["history","History"],["library","Library"],["insights","Insights"]].map(function(p){
+        return h("button",{ class: view.name===p[0] ? "active" : "", onclick:function(){ nav(p[0]); } }, p[1]);
+      })
+    ));
+
+    if (view.name === "history")  return renderHistory();
+    if (view.name === "library")  return renderLibrary();
+    if (view.name === "insights") return renderInsights();
+    return renderToday();
+  }
+
+  function renderLogin(){
+    var email = h("input",{type:"email",placeholder:"email",autocomplete:"username"});
+    var pass  = h("input",{type:"password",placeholder:"password",autocomplete:"current-password"});
+    function go(){ signIn(email.value, pass.value); }
+    APP.append(h("div",{class:"card stack",style:{maxWidth:"420px",margin:"40px auto"}},
+      h("h2",null,"Log in"),
+      h("p",{class:"muted small"},"Training generator for the Win and Swim advanced adults group."),
+      email, pass,
+      loginError ? h("div",{class:"err"}, loginError) : null,
+      h("div",{class:"row"}, h("button",{class:"primary", onclick:go },"Log in"))
+    ));
+    pass.addEventListener("keydown",function(e){ if(e.key==="Enter") go(); });
+  }
+
+  function renderNotCoach(){
+    APP.append(h("div",{class:"card stack"},
+      h("h2",null,"Not set up as a coach yet"),
+      h("p",{class:"muted"},"You are logged in as ", h("b",null,session.user.email),
+        ", but there is no coach row for you, so the database will not show you anything."),
+      h("p",{class:"small muted"},"Fix it in the Supabase SQL Editor (SETUP.md step 4):"),
+      h("pre",{class:"small",style:{background:"#f5f8fa",padding:"10px",borderRadius:"9px",overflowX:"auto"}},
+        "insert into public.tr_coaches (id, display_name)\nvalues ('" + session.user.id + "', 'Your name');"),
+      h("div",{class:"row"},
+        h("button",{class:"primary",onclick:function(){ boot(); }},"I have done that, retry"),
+        h("button",{class:"ghost",onclick:signOut},"Log out"))
+    ));
+  }
+
+  // ---------------------------------------------------------------- Today ---
+  function renderToday(){
+    var S = data.settings || defaultSettings();
+    var dateInput = h("input",{ type:"date", value: (draft && draft.date) || nextClassISO() });
+    var slotSel = h("select",{},
+      SLOTS.map(function(s){ return h("option",{ value:s.key }, s.label); }));
+    function syncSlot(){ slotSel.value = slotForDate(dateInput.value); }
+    syncSlot();
+    dateInput.addEventListener("change", syncSlot);
+    if (draft && draft.slot) slotSel.value = draft.slot;
+
+    var endSel = h("select",{},
+      h("option",{value:"cooldown"},"Finish with a 5 min cool-down"),
+      h("option",{value:"game"},"Finish with a 10 min game"));
+    endSel.value = (draft && draft.ending) || S.default_ending || "cooldown";
+
+    var focusSel = h("select",{}, [h("option",{value:""},"Let the app choose (recommended)")].concat(
+      data.focuses.map(function(f){ return h("option",{value:f.key}, f.name); })));
+    if (draft && draft.focus_key) focusSel.value = "";
+
+    function opts(replace){
+      return { date:dateInput.value, slot:slotSel.value, group:"advanced",
+               ending:endSel.value, focusKey:focusSel.value || null, replace:!!replace };
+    }
+
+    var genBtn = h("button",{ class:"primary big", disabled: generating || busy,
+      onclick:function(){ generateToday(opts(false)); } },
+      generating ? "Writing today's training…" : (draft ? "Generate another" : "Generate today's training"));
+
+    APP.append(h("div",{class:"card stack"},
+      h("div",{class:"row wrap"},
+        h("div",null, h("div",{class:"section-label"},"Date"), dateInput),
+        h("div",null, h("div",{class:"section-label"},"Slot"), slotSel)),
+      h("div",{class:"row wrap"},
+        h("div",{style:{flex:"1",minWidth:"200px"}}, h("div",{class:"section-label"},"Ending"), endSel),
+        h("div",{style:{flex:"1",minWidth:"200px"}}, h("div",{class:"section-label"},"Focus"), focusSel)),
+      h("div",{class:"row"}, genBtn),
+      generating ? h("div",{class:"small muted"},
+        "Picking the focus, filling the 45 minutes, then Claude writes the coaching notes. About 30 seconds.") : null
+    ));
+
+    if (!draft){
+      APP.append(h("div",{class:"empty"},
+        "Press the button. The app picks a focus you have not done recently, fills the 45 minutes from the library, and never repeats a set inside six sessions."));
+      return;
+    }
+    renderSessionCard(draft, true);
+  }
+
+  function renderSessionCard(sk, editable){
+    if (sk.fallbackNote) APP.append(h("div",{class:"banner"}, sk.fallbackNote));
+    (sk.relaxations || []).forEach(function(r){ APP.append(h("div",{class:"banner"}, r)); });
+    (sk.warnings || []).forEach(function(w){ APP.append(h("div",{class:"banner"}, "Check this: " + w)); });
+
+    APP.append(h("div",{class:"card stack"},
+      h("div",{class:"row wrap"},
+        h("h2",{style:{flex:"1"}}, sk.title),
+        h("span",{class:"badge accent"}, fmtDayDate(sk.date)),
+        sk.slot && sk.slot !== "other" ? h("span",{class:"badge"}, slotLabel(sk.slot)) : null,
+        h("span",{class: sk.engine === "ai" ? "badge ok" : "badge"}, sk.engine === "ai" ? "Claude" : "library"),
+        sk.status === "done" ? h("span",{class:"badge ok"},"done") : null,
+        sk.status === "skipped" ? h("span",{class:"badge warn"},"did not run") : null
+      ),
+      h("div",{class:"goalbox"},
+        h("div",{class:"lbl"},"Today's goal"),
+        h("div",{class:"txt"}, sk.goal)),
+      h("div",{class:"tiles"},
+        tile("Total", fmtM(sk.planned_total_m||0), "including warm-up"),
+        tile("Planned", (sk.planned_minutes||60) + " min", "for the slower half"),
+        tile("Main body", fmtM((sk.blocks||[]).reduce(function(a,b){ return a+b.distance_m; },0)), (sk.blocks||[]).length + " blocks"),
+        tile("Ending", sk.ending === "game" ? "Game" : "Cool-down", sk.ending === "game" ? "10 min" : "5 min")
+      ),
+      h("div",{class:"row wrap"},
+        h("button",{class:"primary",onclick:function(){ startPool(sk); }},"Start pool view"),
+        h("button",{onclick:function(){ copyText(asPlainText(sk)); }},"Copy as text"),
+        h("button",{onclick:function(){ window.print(); }},"Print"),
+        editable && !sk.saved && !offline ? h("button",{class:"good",onclick:function(){ saveDraft(null); }},"Save") : null,
+        sk.saved ? h("button",{class:"ghost",onclick:function(){ markStatus(sk, "done"); }},"Mark done") : null,
+        sk.saved ? h("button",{class:"ghost",onclick:function(){ markStatus(sk, "skipped"); }},"Did not run") : null
+      )
+    ));
+
+    APP.append(h("div",{class:"blk"},
+      h("div",{class:"role"},"Warm-up · " + (sk.warmup_minutes||10) + " min"),
+      h("div",{class:"line"},"Easy swim, own pace"),
+      h("div",{class:"watch"},"No exercises. Loosen up and let them talk.")));
+
+    (sk.blocks||[]).forEach(function(b, i){ APP.append(blockCard(b, i, sk, editable)); });
+
+    if (sk.endBlock){
+      var e = sk.endBlock;
+      APP.append(h("div",{class:"blk"},
+        h("div",{class:"role"}, e.block_role === "game" ? "Game · 10 min" : "Cool-down · 5 min"),
+        h("div",{class:"line"}, e.rendered_text),
+        (e.cue || (e.item && e.item.cue)) ? h("div",{class:"cue"}, e.cue || e.item.cue) : null,
+        (e.watch_for || (e.game && e.game.how_it_works)) ?
+          h("div",{class:"watch"}, e.watch_for || e.game.how_it_works) : null));
+    }
+
+    if (sk.saved) APP.append(feedbackCard(sk));
+  }
+
+  function tile(lbl, val, sub){
+    return h("div",{class:"tile"}, h("div",{class:"lbl"},lbl), h("div",{class:"val"},val),
+      sub ? h("div",{class:"sub"},sub) : null);
+  }
+
+  function blockCard(b, i, sk, editable){
+    var rest = restText(b), a1 = advText(b,1), a2 = advText(b,2);
+    var cue = b.cue || (b.item && b.item.cue);
+    var watch = b.watch_for || (b.item && b.item.watch_for);
+    var gear = (b.item && b.item.equipment) || [];
+    return h("div",{class:"blk"},
+      h("div",{class:"role"}, (ROLE_LABEL[b.block_role] || b.block_role) +
+        (b.distance_m ? " · " + b.distance_m + " m" : "")),
+      h("div",{class:"line"}, b.rendered_text + (rest ? ", " + rest : "")),
+      cue ? h("div",{class:"cue"}, cue) : null,
+      watch ? h("div",{class:"watch"}, watch) : null,
+      (a1 || a2) ? h("div",{class:"adv"},
+        a1 ? h("span",null,"Adv 1: " + a1) : null,
+        a2 ? h("span",null,"Adv 2: " + a2) : null) : null,
+      h("div",{class:"meta"},
+        gear.length ? h("span",{class:"badge"}, gear.join(" + ")) : null,
+        (b.item && b.item.effort) ? h("span",{class:"badge"}, b.item.effort) : null,
+        ((b.item && b.item.safety_tags) || []).map(function(t){
+          return h("span",{class:"badge warn"}, t.replace("_"," ")); }),
+        editable && !sk.saved && b.item && b.item.reps ? h("span",{class:"row",style:{gap:"4px"}},
+          h("button",{class:"small",onclick:function(){ nudge(sk, i, -1); }},"−1 rep"),
+          h("button",{class:"small",onclick:function(){ nudge(sk, i, +1); }},"+1 rep")) : null
+      ));
+  }
+
+  // deterministic manual adjustment, and the clock is recomputed straight away
+  function nudge(sk, i, delta){
+    var S = data.settings || defaultSettings();
+    var b = sk.blocks[i];
+    if (!b.item || !b.item.reps) return;
+    if (!setReps(b, (b.reps || b.item.reps) + delta)) return;
+    var c = costBlocks(sk.blocks, S);
+    var endMin = sk.ending === "game" ? (S.game_minutes||10) : (S.cooldown_minutes||5);
+    sk.steady_s = c.steady_s; sk.strong_s = c.strong_s;
+    sk.planned_total_m = c.metres + (sk.endBlock ? sk.endBlock.distance_m : 0);
+    sk.planned_minutes = Math.round(((S.warmup_minutes||10)*60 + c.steady_s + endMin*60)/60);
+    sk.warnings = validate(sk, S).warnings;
+    sk.saved = false; sk.engine = sk.engine;
+    render();
+  }
+
+  function feedbackCard(sk){
+    var note = h("textarea",{ placeholder:"One line for next time (optional)" }, sk.note || "");
+    var rates = [1,2,3,4,5].map(function(n){
+      return h("button",{ class: sk.difficulty_rating === n ? "primary small" : "small",
+        onclick:function(){ setRating(sk, n); } }, String(n));
+    });
+    return h("div",{class:"card stack"},
+      h("div",{class:"section-label"},"After the session"),
+      h("div",{class:"row wrap"},
+        h("span",{class:"small muted"},"How hard was it? 1 easy, 5 too hard"), rates),
+      note,
+      h("div",{class:"row"},
+        h("button",{onclick:function(){ saveNote(sk, note.value); }},"Save note"),
+        h("span",{class:"tiny muted"},"Two 5s in a row and the next session drops 100 m. Two 1s and it goes up.")));
+  }
+  async function markStatus(sk, status){
+    if (!sk.id) return;
+    await mutate(function(){ return sb.from("tr_sessions").update({ status:status }).eq("id", sk.id); }, true);
+    sk.status = status;
+    draft = hydrate(data.sessions.filter(function(s){ return s.id === sk.id; })[0]) || sk;
+    render(); toast(status === "done" ? "Marked done." : "Marked as not run, so its sets go back in the rotation.");
+  }
+  async function setRating(sk, n){
+    if (!sk.id) return;
+    await mutate(function(){ return sb.from("tr_sessions").update({ difficulty_rating:n }).eq("id", sk.id); }, true);
+    sk.difficulty_rating = n; render();
+  }
+  async function saveNote(sk, text){
+    if (!sk.id) return;
+    await mutate(function(){ return sb.from("tr_sessions").update({ note:text }).eq("id", sk.id); }, true);
+    sk.note = text; toast("Saved.");
+  }
+
+  // ------------------------------------------------------------- Pool view ---
+  function startPool(sk){
+    draft = sk; view.name = "pool";
+    poolState = { startedAt: Date.now() };
+    render();
+  }
+  function renderPool(){
+    var sk = draft, S = data.settings || defaultSettings();
+    var pool = h("div",{id:"pool"});
+    var clock = h("div",{class:"clock"},"0:00");
+    var plannedS = ((sk.planned_minutes||60)) * 60;
+
+    function tick(){
+      if (!poolState) return;
+      var el = Math.round((Date.now() - poolState.startedAt)/1000);
+      clock.textContent = mmss(el);
+      // how far through the planned session should we be by now
+      var doneM = 0, totalM = sk.planned_total_m || 1;
+      (sk.blocks||[]).forEach(function(b){ if (b.done) doneM += b.distance_m; });
+      var expected = plannedS * (doneM / totalM);
+      clock.className = "clock" + (el > expected + 240 && doneM > 0 ? " behind" : "");
+      poolState.timer = setTimeout(tick, 1000);
+    }
+    if (poolState && poolState.timer) clearTimeout(poolState.timer);
+    tick();
+
+    pool.append(h("div",{class:"ptop"},
+      clock,
+      h("span",{class:"small"}, "of " + (sk.planned_minutes||60) + " min"),
+      h("span",{style:{flex:"1"}}),
+      h("button",{ onclick:function(){
+        if (poolState && poolState.timer) clearTimeout(poolState.timer);
+        poolState = null; view.name = "today"; render();
+      } }, "Close")));
+
+    pool.append(h("div",{class:"pgoal"}, sk.goal));
+
+    pool.append(h("div",{class:"pblk"},
+      h("div",{class:"prole"},"Warm-up · " + (sk.warmup_minutes||10) + " min"),
+      h("div",{class:"pline"},"Easy swim, own pace")));
+
+    (sk.blocks||[]).forEach(function(b){
+      var rest = restText(b), a1 = advText(b,1), a2 = advText(b,2);
+      var el = h("div",{ class:"pblk" + (b.done ? " done" : ""), onclick:function(){ togglePool(b, el); } },
+        h("div",{class:"prole"}, (ROLE_LABEL[b.block_role]||b.block_role) + (b.distance_m ? " · " + b.distance_m + " m" : "")),
+        h("div",{class:"pline"}, b.rendered_text + (rest ? ", " + rest : "")),
+        (b.cue || (b.item && b.item.cue)) ? h("div",{class:"pcue"}, b.cue || b.item.cue) : null,
+        (a1 || a2) ? h("div",{class:"padv"},
+          (a1 ? "Adv 1: " + a1 : "") + (a1 && a2 ? "    " : "") + (a2 ? "Adv 2: " + a2 : "")) : null);
+      pool.append(el);
+    });
+
+    if (sk.endBlock){
+      var e = sk.endBlock;
+      pool.append(h("div",{class:"pblk"},
+        h("div",{class:"prole"}, e.block_role === "game" ? "Game · 10 min" : "Cool-down · 5 min"),
+        h("div",{class:"pline"}, e.rendered_text),
+        (e.watch_for || (e.game && e.game.how_it_works)) ?
+          h("div",{class:"pcue"}, e.watch_for || e.game.how_it_works) : null));
+    }
+
+    pool.append(h("div",{class:"row",style:{marginTop:"16px",gap:"10px"}},
+      h("button",{style:{flex:"1"},onclick:function(){ markStatus(sk,"done"); }},"Mark done"),
+      h("button",{style:{flex:"1"},onclick:function(){ copyText(asPlainText(sk)); }},"Copy")));
+
+    document.body.append(pool);
+  }
+  async function togglePool(b, el){
+    b.done = !b.done;
+    el.className = "pblk" + (b.done ? " done" : "");
+    if (b.itemId && sb && session && !offline){
+      try{ await sb.from("tr_session_items").update({ done:b.done }).eq("id", b.itemId); }catch(e){}
+    }
+  }
+
+  // -------------------------------------------------------------- History ---
+  function renderHistory(){
+    var q = h("input",{ type:"search", placeholder:"Search titles and sets" });
+    var box = h("div",{class:"card"});
+    function draw(){
+      clear(box);
+      var term = (q.value||"").toLowerCase();
+      var rows = data.sessions.filter(function(s){
+        if (!term) return true;
+        if ((s.title||"").toLowerCase().indexOf(term) !== -1) return true;
+        return (data.items[s.id]||[]).some(function(i){
+          return (i.rendered_text||"").toLowerCase().indexOf(term) !== -1; });
+      });
+      if (!rows.length){ box.append(h("div",{class:"empty"},"Nothing saved yet.")); return; }
+      var lastWeek = null;
+      rows.forEach(function(s){
+        var wk = weekLabel(s.session_date);
+        if (wk !== lastWeek){ box.append(h("div",{class:"section-label",style:{marginTop:"12px"}}, wk)); lastWeek = wk; }
+        var coach = (data.coaches||[]).filter(function(c){ return c.id === s.coach_id; })[0];
+        box.append(h("div",{ class:"hrow", onclick:function(){
+            draft = hydrate(s); view.name = "today"; render(); window.scrollTo(0,0);
+          } },
+          h("div",{class:"hdate"}, fmtDate(s.session_date)),
+          h("div",{class:"hmain"},
+            h("div",{class:"htitle"}, s.title),
+            h("div",{class:"tiny muted"},
+              [ s.slot && s.slot !== "other" ? slotLabel(s.slot) : null,
+                fmtM(s.planned_total_m||0),
+                coach ? coach.display_name : null,
+                s.status === "done" ? "done" : (s.status === "skipped" ? "did not run" : "planned")
+              ].filter(Boolean).join(" · "))),
+          s.difficulty_rating ? h("span",{class:"badge"}, s.difficulty_rating + "/5") : null,
+          s.engine === "ai" ? h("span",{class:"badge ok"},"Claude") : h("span",{class:"badge"},"library")
+        ));
+      });
+    }
+    q.addEventListener("input", draw);
+    APP.append(h("div",{class:"filters"}, q));
+    APP.append(box); draw();
+
+    var lastThu = data.sessions.filter(function(s){ return s.slot === "thu_1930"; })[0];
+    if (lastThu) APP.append(h("div",{class:"card"},
+      h("div",{class:"section-label"},"Quick look"),
+      h("button",{onclick:function(){ draft = hydrate(lastThu); view.name="today"; render(); window.scrollTo(0,0); }},
+        "What did we do last Thursday?")));
+  }
+  function weekLabel(iso){
+    var d = new Date(iso + "T12:00:00Z");
+    var day = d.getUTCDay(), diff = (day === 0 ? 6 : day - 1);
+    d.setUTCDate(d.getUTCDate() - diff);
+    return "Week of " + fmtDate(d.toISOString().slice(0,10));
+  }
+
+  // -------------------------------------------------------------- Library ---
+  function renderLibrary(){
+    var roles = {};
+    data.library.forEach(function(x){ roles[x.role] = (roles[x.role]||0)+1; });
+    var proposed = data.library.filter(function(x){ return (x.status||"active") === "proposed"; });
+
+    var q = h("input",{type:"search",placeholder:"Search the library",value:lib.q});
+    var roleSel = h("select",{class:"small"}, [h("option",{value:""},"All roles")].concat(
+      Object.keys(roles).sort().map(function(r){ return h("option",{value:r}, (ROLE_LABEL[r]||r) + " (" + roles[r] + ")"); })));
+    roleSel.value = lib.role;
+    var focusSel = h("select",{class:"small"}, [h("option",{value:""},"All focuses")].concat(
+      data.focuses.map(function(f){ return h("option",{value:f.key}, f.name); })));
+    focusSel.value = lib.focus;
+
+    var box = h("div",{class:"card"});
+    function draw(){
+      lib.q = q.value; lib.role = roleSel.value; lib.focus = focusSel.value;
+      clear(box);
+      var hist = historyForRepeat({ group:"advanced", date: todayISO() });
+      var S = data.settings || defaultSettings();
+      var term = lib.q.toLowerCase();
+      var rows = data.library.filter(function(x){
+        if ((x.status||"active") !== "active") return false;
+        if (lib.role && x.role !== lib.role) return false;
+        if (lib.focus && (x.focus_tags||[]).indexOf(lib.focus) === -1) return false;
+        if (term && (x.name + " " + x.structure + " " + (x.cue||"")).toLowerCase().indexOf(term) === -1) return false;
+        return true;
+      }).sort(function(a,b){ return a.role.localeCompare(b.role) || a.name.localeCompare(b.name); });
+
+      if (!rows.length){ box.append(h("div",{class:"empty"},"Nothing matches.")); return; }
+      var roleCounts = {};
+      data.library.forEach(function(x){
+        if ((x.status||"active") !== "active" || x.active === false) return;
+        var k = x.role + (x.whole_body ? ":whole" : "");
+        roleCounts[k] = (roleCounts[k]||0)+1;
+      });
+      rows.forEach(function(x){
+        var since = sessionsSinceItem(hist, x.id);
+        var win = effectiveWindow(x, roleCounts[x.role + (x.whole_body ? ":whole" : "")]||1, S);
+        var locked = since < win;
+        box.append(h("div",{class:"lrow"},
+          h("div",{class:"lmain"},
+            h("div",{style:{fontWeight:"600"}}, x.name,
+              locked ? h("span",{class:"badge warn",style:{marginLeft:"6px"}},
+                "back in " + (win - since) + " session" + (win-since===1?"":"s")) : null,
+              x.source === "ai" ? h("span",{class:"badge accent",style:{marginLeft:"6px"}},"Claude") : null),
+            h("div",{class:"small muted"}, x.structure + (x.rest ? ", " + x.rest : "")),
+            h("div",{class:"tiny muted"},
+              [ ROLE_LABEL[x.role]||x.role,
+                (x.equipment||[]).join(" + ") || "no gear",
+                "used " + (x.times_used||0) + "x",
+                x.last_used_on ? "last " + fmtDate(x.last_used_on) : "never used"
+              ].join(" · "))),
+          h("button",{class:"ghost small",onclick:function(){ toggleActive(x); }},"Retire")
+        ));
+      });
+    }
+    [q,roleSel,focusSel].forEach(function(el){ el.addEventListener("input",draw); el.addEventListener("change",draw); });
+
+    APP.append(h("div",{class:"card stack"},
+      h("div",{class:"row wrap"},
+        h("h2",{style:{flex:"1"}},"Library"),
+        h("span",{class:"badge"}, data.library.filter(function(x){ return (x.status||"active")==="active"; }).length + " sets"),
+        h("button",{ class:"primary small", disabled: busy || offline,
+          onclick:function(){ growLibrary(); } }, "Ask Claude for new sets")),
+      h("div",{class:"small muted"},
+        "The generator only uses active sets. Retiring one keeps it in your saved trainings but stops it coming up again.")));
+
+    if (proposed.length){
+      var pbox = h("div",{class:"card stack"},
+        h("div",{class:"row"}, h("h2",{style:{flex:"1"}},"Claude suggests"),
+          h("span",{class:"badge accent"}, proposed.length + " waiting")));
+      proposed.forEach(function(x){
+        pbox.append(h("div",{class:"lrow"},
+          h("div",{class:"lmain"},
+            h("div",{style:{fontWeight:"600"}}, x.name),
+            h("div",{class:"small muted"}, x.structure + (x.rest ? ", " + x.rest : "")),
+            x.cue ? h("div",{class:"small",style:{color:"var(--accent-ink)"}}, x.cue) : null,
+            x.watch_for ? h("div",{class:"tiny muted"}, x.watch_for) : null,
+            h("div",{class:"tiny muted"}, (ROLE_LABEL[x.role]||x.role) + " · " + (x.focus_tags||[]).join(", "))),
+          h("div",{class:"row",style:{gap:"4px"}},
+            h("button",{class:"small good",onclick:function(){ setStatus(x,"active"); }},"Add"),
+            h("button",{class:"small danger",onclick:function(){ setStatus(x,"rejected"); }},"No"))));
+      });
+      APP.append(pbox);
+    }
+
+    APP.append(h("div",{class:"filters"}, q, roleSel, focusSel));
+    APP.append(box); draw();
+  }
+  function toggleActive(x){
+    if (!confirm("Retire \"" + x.name + "\"? It stops coming up in new trainings.")) return;
+    mutate(function(){ return sb.from("tr_exercises").update({ active:false }).eq("id", x.id); });
+  }
+  function setStatus(x, status){
+    mutate(function(){ return sb.from("tr_exercises").update({ status:status }).eq("id", x.id); });
+  }
+
+  async function growLibrary(){
+    var thin = thinRoles();
+    var focus = data.focuses[Math.floor(Math.random()*data.focuses.length)];
+    var role = thin.length ? thin[0].role : "main_set";
+    busy = true; render();
+    var res = await callAi("propose_sets", {
+      role: role, focus: focus ? { key:focus.key, name:focus.name, what_it_trains:focus.what_it_trains } : null,
+      count: 5,
+      existing: data.library.filter(function(x){ return x.role === role; })
+        .map(function(x){ return { name:x.name, structure:x.structure }; }).slice(0,40)
+    });
+    busy = false;
+    if (!res.ok){
+      render();
+      alert(FALLBACK_NOTE[res.code] || "Claude was not reachable just now. Try again in a minute.");
+      return;
+    }
+    var rows = (res.items || []).map(function(it){
+      return {
+        code: it.code, name: it.name, role: role,
+        family: it.family || null,
+        focus_tags: it.focus_tags || (focus ? [focus.key] : []),
+        strokes: it.strokes || ["freestyle"],
+        equipment: it.equipment || [],
+        safety_tags: it.safety_tags || [],
+        structure: it.structure, distance_m: it.distance_m,
+        reps: it.reps || null, rep_distance_m: it.rep_distance_m || null,
+        rest: it.rest || null, rest_adv1: it.rest_adv1 || null, rest_adv2: it.rest_adv2 || null,
+        effort: it.effort || null, cue: it.cue, watch_for: it.watch_for || null,
+        steady_variant: it.adv1 || null, strong_variant: it.adv2 || null,
+        source:"ai", created_by: session.user.id, status:"proposed"
+      };
+    }).filter(function(r){ return r.code && r.name && r.structure && r.cue && r.distance_m; });
+    if (!rows.length){ render(); alert("Claude did not send anything usable that time. Try again."); return; }
+    await mutate(function(){ return sb.from("tr_exercises").upsert(rows, { onConflict:"code", ignoreDuplicates:true }); });
+    toast(rows.length + " suggestions ready to review.");
+  }
+
+  function thinRoles(){
+    var S = data.settings || defaultSettings();
+    var counts = {};
+    data.library.forEach(function(x){
+      if ((x.status||"active")==="active" && x.active !== false) counts[x.role] = (counts[x.role]||0)+1;
+    });
+    var need = { main_set:10, technique_drill:10, kick_set:8, pull_set:8, sprint_set:6,
+                 skill_set:6, turns:6, open_water:4, activation:3, cooldown:3 };
+    var out = [];
+    Object.keys(need).forEach(function(r){
+      var have = counts[r] || 0;
+      if (have < need[r]) out.push({ role:r, have:have, need:need[r] });
+    });
+    return out.sort(function(a,b){ return (a.have/a.need) - (b.have/b.need); });
+  }
+
+  // ------------------------------------------------------------- Insights ---
+  function renderInsights(){
+    var recent = data.sessions.filter(function(s){ return s.status !== "skipped"; }).slice(0, 24);
+    var byFocus = {};
+    recent.forEach(function(s){ byFocus[s.focus_key] = (byFocus[s.focus_key]||0)+1; });
+    var maxF = Math.max(1, Math.max.apply(null, [1].concat(Object.keys(byFocus).map(function(k){ return byFocus[k]; }))));
+
+    var vols = recent.slice(0,12).reverse();
+    var avgVol = vols.length ? Math.round(vols.reduce(function(a,s){ return a + (s.planned_total_m||0); },0)/vols.length) : 0;
+    var aiCount = recent.filter(function(s){ return s.engine === "ai"; }).length;
+
+    APP.append(h("div",{class:"tiles"},
+      tile("Sessions", String(data.sessions.length), "saved in total"),
+      tile("Average", fmtM(avgVol), "last " + vols.length + " sessions"),
+      tile("Written by Claude", aiCount + " of " + recent.length, "the rest came from the library"),
+      tile("Library", String(data.library.filter(function(x){ return (x.status||"active")==="active"; }).length), "active sets")
+    ));
+
+    var fbox = h("div",{class:"card stack"}, h("div",{class:"section-label"},"Focus balance, last " + recent.length + " sessions"));
+    data.focuses.forEach(function(f){
+      var n = byFocus[f.key] || 0;
+      fbox.append(h("div",null,
+        h("div",{class:"row"},
+          h("span",{class:"small",style:{flex:"1"}}, f.name),
+          h("span",{class:"tiny muted"}, n ? n + "x" : "not yet")),
+        h("div",{class:"bar"}, h("i",{style:{width:(n/maxF*100)+"%",opacity: n?1:0.15}}))));
+    });
+    APP.append(fbox);
+
+    var thin = thinRoles();
+    if (thin.length){
+      var tb = h("div",{class:"card stack"},
+        h("div",{class:"section-label"},"The pool is getting thin"),
+        h("div",{class:"small muted"},"These roles have few sets, so the generator will start repeating them sooner than six sessions."));
+      thin.forEach(function(t){
+        tb.append(h("div",{class:"row"},
+          h("span",{class:"small",style:{flex:"1"}}, ROLE_LABEL[t.role]||t.role),
+          h("span",{class:"badge warn"}, t.have + " of " + t.need)));
+      });
+      tb.append(h("button",{class:"primary small",disabled:offline,onclick:growLibrary},"Ask Claude for new sets"));
+      APP.append(tb);
+    }
+
+    var stale = data.library.filter(function(x){ return (x.status||"active")==="active" && !x.last_used_on; });
+    var over = data.library.filter(function(x){ return (x.times_used||0) >= 4; })
+      .sort(function(a,b){ return (b.times_used||0)-(a.times_used||0); }).slice(0,8);
+    APP.append(h("div",{class:"card stack"},
+      h("div",{class:"section-label"},"Sets you have never used"),
+      h("div",{class:"small muted"}, stale.length + " of " +
+        data.library.filter(function(x){ return (x.status||"active")==="active"; }).length + " have never come up."),
+      over.length ? h("div",{class:"section-label",style:{marginTop:"10px"}},"Most used") : null,
+      over.map(function(x){
+        return h("div",{class:"row"},
+          h("span",{class:"small",style:{flex:"1"}}, x.name),
+          h("span",{class:"badge"}, (x.times_used||0) + "x"));
+      })));
+
+    APP.append(h("div",{class:"card stack"},
+      h("div",{class:"section-label"},"Settings"),
+      settingRow("Steady pace, seconds per 100 m (includes rest and you talking)","pace_steady_s_per_100"),
+      settingRow("Faster pace, seconds per 100 m","pace_strong_s_per_100"),
+      settingRow("Main block, least metres","main_min_m"),
+      settingRow("Main block, most metres","main_max_m"),
+      settingRow("Sessions before a set can come back","no_repeat_sessions"),
+      h("div",{class:"tiny muted"},"Change the two pace numbers after a couple of real sessions. They are what makes the clock come out right.")));
+  }
+  function settingRow(label, key){
+    var S = data.settings || defaultSettings();
+    var inp = h("input",{ class:"small", type:"number", value:String(S[key]), style:{width:"90px"} });
+    inp.addEventListener("change", function(){
+      var v = parseInt(inp.value,10);
+      if (!isFinite(v)) return;
+      var patch = {}; patch[key] = v;
+      mutate(function(){ return sb.from("tr_settings").update(patch).eq("id",1); });
+    });
+    return h("div",{class:"row"}, h("span",{class:"small",style:{flex:"1"}}, label), inp);
+  }
+
+  // ==========================================================================
+  // boot
+  // ==========================================================================
+  async function boot(){
+    if (!configured || !window.supabase){ render(); return; }
+    clear(APP);
+    APP.append(h("div",{class:"empty"},"Loading…"));
+
+    var sres = await sb.auth.getSession();
+    session = (sres.data && sres.data.session) || null;
+
+    sb.auth.onAuthStateChange(function(_e, ns){
+      var had = !!session;
+      session = ns || null;
+      if (!!session !== had){
+        if (!session){ notCoach = false; render(); return; }
+        loadAll().then(afterLoad).catch(function(){ afterLoadFailed(); });
+      }
+    });
+
+    if (!session){ render(); return; }
+    try{ await loadAll(); afterLoad(); }
+    catch(e){ console.warn(e); afterLoadFailed(e); }
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", function(){ refresh(); });
+    window.addEventListener("offline", function(){ offline = true; render(); });
+  }
+  function afterLoad(){
+    coachRow = (data.coaches||[]).filter(function(c){ return c.id === session.user.id; })[0] || null;
+    notCoach = !coachRow;
+    // if the library came back empty while signed in, RLS is blocking us
+    if (!notCoach && !data.library.length && !data.focuses.length) notCoach = false;
+    var t = todayISO();
+    var todays = data.sessions.filter(function(s){ return s.session_date === t; })[0];
+    if (todays && !draft) draft = hydrate(todays);
+    render();
+  }
+  function afterLoadFailed(e){
+    // no network, or the project is paused. Fall back to the phone's copy.
+    var ok = loadMirror();
+    if (ok){
+      coachRow = (data.coaches||[]).filter(function(c){ return c.id === session.user.id; })[0] || null;
+      render();
+      return;
+    }
+    clear(APP);
+    APP.append(h("div",{class:"card stack"},
+      h("h2",null,"Can't reach the database"),
+      h("p",{class:"muted"},"Either there is no connection, or the Supabase project has gone to sleep. Free projects pause after about a week of no use: open the Supabase dashboard and press Restore, then come back."),
+      e ? h("div",{class:"err"}, String(e.message || e)) : null,
+      h("div",{class:"row"},
+        h("button",{class:"primary",onclick:function(){ boot(); }},"Try again"),
+        h("button",{class:"ghost",onclick:signOut},"Log out"))));
+  }
+
+  // ==========================================================================
+  // Test and debug seam. verify.js in this repo drives the engine through this
+  // without a browser and without a database, which is how the 20-session
+  // no-repeat and clock checks run. Harmless in the app: it exposes functions,
+  // not data the coach cannot already see on screen.
+  // ==========================================================================
+  window.WSTRAIN_ENGINE = {
+    buildSkeleton: buildSkeleton, validate: validate, costBlocks: costBlocks,
+    setReps: setReps, renderLine: renderLine, pickFocus: pickFocus,
+    pickForRole: pickForRole, effectiveWindow: effectiveWindow,
+    historyForRepeat: historyForRepeat, sessionsSinceItem: sessionsSinceItem,
+    sessionsSinceFamily: sessionsSinceFamily, blocksToItems: blocksToItems,
+    asPlainText: asPlainText, defaultSettings: defaultSettings,
+    ARCHETYPES: ARCHETYPES, FOCUS_ARCHETYPES: FOCUS_ARCHETYPES,
+    ROLE_LABEL: ROLE_LABEL, prosePasses: prosePasses, applyAi: applyAi,
+    data: data,
+    setData: function(d){ Object.keys(d).forEach(function(k){ data[k] = d[k]; }); },
+    // lets a session card be drawn without a database, for eyeballing the
+    // layout and for the screenshot check in verify
+    renderCard: renderSessionCard,
+    clearApp: function(){ clear(APP); }
+  };
+
+  boot();
+})();
+</script>
+<script>
+  // Installable-app service worker (no-op on file://; only runs over https).
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+  }
+</script>
+</body>
+</html>
