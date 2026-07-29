@@ -2089,7 +2089,7 @@
           h("div",{class:"lmain"},
             h("div",{style:{fontWeight:"600"}}, x.name),
             h("div",{class:"small muted"}, x.structure + (x.rest ? ", " + x.rest : "")),
-            x.cue ? h("div",{class:"small",style:{color:"var(--accent-ink)"}}, x.cue) : null,
+            x.cue ? h("div",{class:"small",style:{color:"var(--accent-text)"}}, x.cue) : null,
             x.watch_for ? h("div",{class:"tiny muted"}, x.watch_for) : null,
             h("div",{class:"tiny muted"}, (ROLE_LABEL[x.role]||x.role) + " · " + (x.focus_tags||[]).join(", "))),
           h("div",{class:"row",style:{gap:"4px"}},
@@ -2317,7 +2317,30 @@
     // lets a session card be drawn without a database, for eyeballing the
     // layout and for the screenshot check in verify
     renderCard: renderSessionCard,
-    clearApp: function(){ clear(APP); }
+    clearApp: function(){ clear(APP); },
+
+    // The harness also has to draw every view, not just check the numbers.
+    // render() gates on a handful of closure variables (is there a login, is
+    // there a draft, which tab is open), so the harness gets one setter for
+    // those and then calls render() itself. Nothing here draws anything the
+    // coach cannot already see, and nothing here is reachable from the UI.
+    render: render,
+    startPool: startPool,
+    hydrate: hydrate,
+    setUi: function(u){
+      if ("configured" in u)  configured  = !!u.configured;
+      if ("sb" in u)          sb          = u.sb;
+      if ("session" in u)     session     = u.session;
+      if ("coachRow" in u)    coachRow    = u.coachRow;
+      if ("notCoach" in u)    notCoach    = !!u.notCoach;
+      if ("offline" in u)     offline     = !!u.offline;
+      if ("staleMirror" in u) staleMirror = !!u.staleMirror;
+      if ("loginError" in u)  loginError  = u.loginError || "";
+      if ("busy" in u)        busy        = !!u.busy;
+      if ("generating" in u)  generating  = !!u.generating;
+      if ("draft" in u)       draft       = u.draft;
+      if ("view" in u)        view.name   = u.view;
+    }
   };
 
   boot();
