@@ -193,7 +193,11 @@ check(thinFocus.length === 0, "every focus has at least two sets",
 //     that actually ship.
 //
 // Everything else is still a no-op, and the engine still may not use classList,
-// innerHTML, dataset, closest, matches or getBoundingClientRect.
+// innerHTML, dataset, closest, matches, getBoundingClientRect or
+// style.setProperty. That ban used to be a comment nobody could enforce, which is
+// how draft edits calling classList got written in the first place. Section 17c
+// now reads the script as text and fails naming the line, so nothing here needs
+// to grow to accommodate them: growing the stub is what would hide the bug.
 // ---------------------------------------------------------------------------
 function textOf(n){
   if (!n) return "";
@@ -1432,14 +1436,174 @@ function analyse(s){
 console.log("\n=== 17. The engine and the stylesheet agree on names");
 analyse(sweep).forEach(f =>
   check(f.ok, f.what, f.what + (f.detail ? "  [" + f.detail + "]" : "")));
-const orphanClasses = [...styledClasses].filter(c => !sweep.classes[c]);
 console.log("  " + Object.keys(sweep.classes).length + " classes painted, " +
   styledClasses.size + " styled, " + definedTokens.size + " tokens defined");
-// Reported, not failed. A rule can be for a state the sweep does not reach, and
-// a harness that fails on dead CSS would fight every half-finished pass 2 edit.
-if (orphanClasses.length)
-  console.log("  styled but never painted in this sweep, so possibly dead: ." +
-    orphanClasses.join(", ."));
+// The dead-CSS list moved to 17c, which knows about class names the sweep never
+// paints and so stops calling them dead.
+
+// ---------------------------------------------------------------------------
+// 17c. The vocabulary, the tokens and the class names, read as text
+//
+// Sections 16 and 17 can only judge code that actually ran. Three kinds of
+// interface bug sit outside that reach and ship green today:
+//
+//  1. A screen this sweep never opens reaches for classList, dataset, closest,
+//     matches, getBoundingClientRect or style.setProperty. The stub has none of
+//     them, so the day something drives that screen the check throws instead of
+//     reporting. The stub is not the reason they are banned. This is hand-written
+//     vanilla JS with one small h() helper, each of them has a plain equivalent
+//     (className, an attribute, a variable the handler already closes over), and
+//     the ban is what keeps every screen driveable with no browser at all.
+//  2. A var(--x) in a branch nothing paints, or in a style attribute in <body>,
+//     which the runtime harvest cannot see at all: a parsed attribute lands in
+//     attrs, it never reaches el.style, so harvest() reads none of it. A missing
+//     token was reported against this file for a week and turned out not to
+//     exist. Reading every var() in the file settles that argument for good
+//     instead of settling it for one seeded season.
+//  3. A class literal in a branch nothing paints. The generating branch is the
+//     live example: nothing here ever sets generating true, so the row at
+//     index.html:1743 is invisible to section 16 by construction.
+//
+// All three are text, so this adds no seed, no clock and no sandbox, and section
+// 19 proves each one fails when the text is wrong.
+// ---------------------------------------------------------------------------
+
+// Comments and string bodies are blanked before the vocabulary scan, newlines
+// kept so the reported index.html line is the real one. Without that, "Nothing
+// matches." in a piece of copy reads as a call to Element.matches, and a check
+// that cries wolf on day one is a check somebody deletes on day two.
+function scrub(src, keepStrings){
+  let out = "", i = 0;
+  const n = src.length;
+  while (i < n){
+    const c = src[i], d = src[i + 1];
+    if (c === "/" && d === "/"){ while (i < n && src[i] !== "\n") i++; continue; }
+    if (c === "/" && d === "*"){
+      const j = src.indexOf("*/", i + 2), end = j === -1 ? n : j + 2;
+      out += src.slice(i, end).replace(/[^\n]/g, " ");
+      i = end; continue;
+    }
+    if (c === '"' || c === "'" || c === "`"){
+      const q = c;
+      out += keepStrings ? c : " "; i++;
+      while (i < n){
+        if (src[i] === "\\"){ out += keepStrings ? src.slice(i, i + 2) : "  "; i += 2; continue; }
+        if (src[i] === q){ out += keepStrings ? q : " "; i++; break; }
+        out += keepStrings ? src[i] : (src[i] === "\n" ? "\n" : " ");
+        i++;
+      }
+      continue;
+    }
+    out += c; i++;
+  }
+  return out;
+}
+
+// The index.html line the engine script starts on, so a failure names a line he
+// can open rather than an offset into a string.
+const SCRIPT_AT = html.slice(0, html.indexOf(appScript)).split("\n").length - 1;
+
+// Member expressions, never bare words, so a local variable or a piece of copy
+// called "matches" is not an offence. An entry may allow exactly one known line.
+const BANNED = [
+  { name: "classList",              re: /\.classList\b/ },
+  { name: "dataset",                re: /\.dataset\b/ },
+  { name: "closest(",               re: /\.closest\s*\(/ },
+  { name: "matches(",               re: /\.matches\s*\(/ },
+  { name: "getBoundingClientRect(", re: /\.getBoundingClientRect\s*\(/ },
+  { name: "setProperty(",           re: /\.setProperty\s*\(/ },
+  // h() owns the app's only innerHTML write, the html: branch. Anywhere else it
+  // is both invisible to the stub and a way to inject markup, because every
+  // string on these screens comes back out of the database.
+  { name: "innerHTML",              re: /\.innerHTML\b/,
+    allow: raw => /k\s*===\s*"html"/.test(raw) }
+];
+
+function staticAudit(scriptText, htmlText){
+  const out = [];
+  function want(what, cond, detail){
+    out.push({ what, ok: !!cond, detail: detail == null ? "" : String(detail) });
+  }
+  // If scrub loses track of where a string ends it blanks live code instead, and
+  // a scan over blanked code cannot fail: it reports all clear for ever. Keeping
+  // the strings and compiling the result is the canary. Compiling is not running.
+  const kept = scrub(scriptText, true);
+  let reads = true, why = "";
+  try{ new vm.Script(kept, { filename: "vocabulary-scan" }); }
+  catch(e){ reads = false; why = e.message; }
+  want("the text scanner reads the script instead of blanking it",
+       reads, "the comment-stripped script no longer compiles, so every scan below " +
+       "is blind and passing means nothing: " + why);
+
+  const code = scrub(scriptText, false);
+  const codeLines = code.split("\n"), rawLines = scriptText.split("\n");
+  const offenders = [];
+  BANNED.forEach(rule => {
+    const at = [];
+    codeLines.forEach((L, i) => {
+      if (!rule.re.test(L)) return;
+      if (rule.allow && rule.allow(rawLines[i] || "")) return;
+      at.push(SCRIPT_AT + i + 1);
+    });
+    if (at.length) offenders.push(rule.name + " at index.html:" + at.join(" and :"));
+  });
+  want("the engine keeps to the DOM vocabulary the harness can drive",
+       offenders.length === 0,
+       "the stub has no such thing, so this throws on his phone before it throws " +
+       "here: " + offenders.join("; "));
+
+  const css = (htmlText.match(/<style>([\s\S]*?)<\/style>/) || ["", ""])[1]
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const defined = new Set([...css.matchAll(/(--[-\w]+)\s*:/g)].map(m => m[1]));
+  const styled = new Set([...css.matchAll(/\.(-?[A-Za-z_][-\w]*)/g)].map(m => m[1]));
+  // Every var() in the file, not only the ones a painted element happened to
+  // carry. This is the check that makes the missing-token argument unrepeatable.
+  const scanned = htmlText.replace(/<!--[\s\S]*?-->/g, "");
+  const used = [...new Set([...scanned.matchAll(/var\(\s*(--[-\w]+)/g)].map(m => m[1]))];
+  const stray = used.filter(v => !defined.has(v));
+  want("every var(--x) anywhere in index.html resolves to a token index.html defines",
+       stray.length === 0, "used but never defined: " + stray.join(", "));
+
+  // Class names as written, so both arms of a ternary count even though a single
+  // sweep can only ever paint one of them.
+  const lits = new Set();
+  const addNames = s => String(s).split(/\s+/).filter(Boolean)
+    .forEach(n => { if (/^-?[A-Za-z_][-\w]*$/.test(n)) lits.add(n); });
+  [...kept.matchAll(/\bclass\s*:\s*"([^"]*)"/g)].forEach(m => addNames(m[1]));
+  [...kept.matchAll(/\bclassName\s*=\s*"([^"]*)"/g)].forEach(m => addNames(m[1]));
+  [...kept.matchAll(/\bclass(?:\s*:|Name\s*=)\s*[^,\n]*?\?\s*"([^"]*)"\s*:\s*"([^"]*)"/g)]
+    .forEach(m => { addNames(m[1]); addNames(m[2]); });
+  const unstyled = [...lits].filter(c => !styled.has(c));
+  want("every class name written into the script has a rule in the stylesheet",
+       unstyled.length === 0, "written but styled nowhere: ." + unstyled.join(", ."));
+
+  const htmlClasses = new Set();
+  walk(parseBody(htmlText).root, e => classesOf(e).forEach(c => htmlClasses.add(c)));
+  return { findings: out, lits, styled, defined, htmlClasses,
+           htmlProps: [...kept.matchAll(/(^|[{,\s])html\s*:/g)].length };
+}
+
+console.log("\n=== 17c. The script text keeps to the contract");
+const audit = staticAudit(appScript, html);
+audit.findings.forEach(f =>
+  check(f.ok, f.what, f.what + (f.detail ? "  [" + f.detail + "]" : "")));
+console.log("  " + audit.lits.size + " class names written in the script, " +
+  audit.defined.size + " tokens defined, engine script starts at index.html:" +
+  (SCRIPT_AT + 1));
+// Reported, never failed. A rule can be for a state nothing reaches yet, and a
+// harness that fails on dead CSS would fight every half-finished pass 2 edit. The
+// union is what stops the false alarm: a class assigned only in an unpainted
+// branch is not dead, it is unreached, and the runtime list alone cannot tell.
+const assignedClasses = new Set([...Object.keys(sweep.classes), ...audit.lits,
+                                 ...audit.htmlClasses]);
+const orphanClasses = [...audit.styled].filter(c => !assignedClasses.has(c));
+console.log("  " + (orphanClasses.length
+  ? "styled but assigned nowhere, so probably dead: ." + orphanClasses.join(", .")
+  : "every styled class is assigned somewhere"));
+if (audit.htmlProps)
+  console.log("  note: " + audit.htmlProps + " h() call" +
+    (audit.htmlProps === 1 ? "" : "s") + " pass raw markup through html:, and the " +
+    "stub cannot see inside those, so their contents are unchecked");
 
 // ---------------------------------------------------------------------------
 // 18. The paint checks can actually fail
@@ -1520,6 +1684,48 @@ MUTANTS.forEach(m => {
 // them, so put them back for anything that runs after this.
 setSeed(1);
 setNow(BASE_NOW);
+
+// ---------------------------------------------------------------------------
+// 19. The text checks fail when the text is wrong (control)
+//
+// Same rule as section 18: a check that cannot fail is decoration that reads as
+// protection. Each of these three is an edit that was actually proposed for pass
+// 2, and each one is invisible to sections 16 and 17, so they show what 17c is
+// for as well as that it works. Text in, findings out, no sandbox and no clock.
+// ---------------------------------------------------------------------------
+console.log("\n=== 19. The text checks fail when the text is wrong (control)");
+const TEXT_MUTANTS = [
+  { what: "h() moved from className to classList, the way the draft edits write it",
+    inScript: true,
+    from: 'if (k === "class") e.className = v;',
+    to:   'if (k === "class") e.classList.add(v);' },
+  { what: "a var() token in a <body> style attribute, which no painted element carries",
+    inScript: false,
+    from: '<div id="app"></div>',
+    to:   '<div id="app" style="color:var(--accent-ink)"></div>' },
+  { what: "a class typo in the generating branch, which nothing here ever paints",
+    inScript: true,
+    from: 'generating ? h("div",{class:"small muted"},',
+    to:   'generating ? h("div",{class:"smal muted"},' }
+];
+TEXT_MUTANTS.forEach(m => {
+  const script = m.inScript ? appScript.split(m.from).join(m.to) : appScript;
+  const page = m.inScript ? html : html.split(m.from).join(m.to);
+  if (m.inScript ? script === appScript : page === html){
+    bad('the control cannot break it that way any more, so it proves nothing: "' +
+        m.from.slice(0, 46) + '"');
+    return;
+  }
+  let fails;
+  try{
+    fails = staticAudit(script, page).findings.filter(f => !f.ok);
+  }catch(e){
+    fails = [{ what: "the audit threw: " + e.message }];
+  }
+  check(fails.length > 0,
+    m.what + ": caught by \"" + ((fails[0] || {}).what || "").slice(0, 44) + "\"",
+    m.what + ": NOT CAUGHT, so section 17c is decoration.");
+});
 
 // ---------------------------------------------------------------------------
 console.log("\n" + "=".repeat(64));
