@@ -3,14 +3,58 @@
 Read this first if you are picking the project up fresh. `SETUP.md` is the
 user-facing guide; this file is the build state.
 
-## START HERE: one live bug, and where pass 2 got to
+## START HERE: the redesign is done and shipped
 
-**There is no live bug. An earlier version of this file claimed there was, and it
-was wrong.** The pass 2 triage agent reported that `index.html:2092` still read
-`style:{color:"var(--accent-ink)"}` against a deleted token. It does not. That line
-reads `var(--accent-text)` and always did after pass 1. Verified two ways: `grep
-accent-ink index.html` returns nothing, and a sweep of every `var(--x)` used in the
-file against every `--x:` defined in it finds no undefined token at all.
+The iOS redesign is live at cache `ws-training-v5`. `node verify.js` passes 128
+checks, and `SEEDS=1-20 node verify.js` passes 4,000 simulated sessions. All six
+screens have been rendered and looked at.
+
+What the app has now: a bottom tab bar in thumb reach, large scrolling titles,
+grouped inset lists, sheets for editing, full dark mode from
+`prefers-color-scheme`, and a Pool view kept deliberately in the opposite
+register, opaque black on white with no glass, because the deck is bright and his
+hands are wet.
+
+### How to see any screen without a login
+
+`verify.js` can render every view behind its DOM stub, and that is how all six
+were checked. The generator lives outside the repo, in the session scratchpad, and
+the method is worth repeating rather than the file: slice `verify.js` up to the
+line after `const paintUser`, repoint `ROOT`, set `env.win.supabase = {}` (render
+bails to "Couldn't load the database library" without it), then
+`E.setData({focuses, library: paintLib, games, settings: S, sessions:
+paintSessions, items: paintItems, coaches: paintCoaches})` after `setSeed(4242)`
+and `setNow(BASE_NOW)`, drive with `E.setUi({...})` and `E.render()` or
+`E.startPool(sk)`, and serialise `doc.documentElement`. Write the output into the
+app folder, because a preview pane will not serve files from outside it, and
+delete it afterwards.
+
+**Measure, do not reason.** Every real defect in the last round was found by
+rendering the page and reading numbers off it, not by reading code. Three review
+rounds at high effort produced findings that were roughly one-in-five wrong, and
+the two worst bugs in the whole redesign were found by neither the reviewers nor
+the audits.
+
+### Two traps this file learned the hard way
+
+1. **Never write a raw tag name in angle brackets inside a CSS comment.** A
+   comment reading `/* a <button> shrinks to fit */` made `verify.js` parse the
+   whole stylesheet as page content and fail with an unrelated-looking message. A
+   real browser treats `<style>` as raw text so it renders fine, which is exactly
+   what makes it hard to spot. The harness parser does not.
+2. **A `var()` inside a custom property is substituted on the element that
+   declares it.** Declaring `--p-call:calc(48px * var(--pool-scale))` on `:root`
+   froze it against `:root`'s scale, so `#pool.big{--pool-scale:1.2}` changed
+   nothing and the Bigger text switch was inert while still saving to
+   localStorage. The size tokens now live on `#pool` itself.
+
+### The old accent-ink note, kept because the lesson stands
+
+An earlier version of this file claimed a live bug at `index.html:2092`
+referencing a deleted `--accent-ink`. It was never true. The line reads
+`var(--accent-text)`, `grep accent-ink index.html` returns nothing, and a sweep of
+every `var(--x)` used against every `--x:` defined finds no undefined token. It
+came from an agent report that was relayed without checking.
 
 **The lesson, which matters more than the non-bug:** the four `design/pass2-*.md`
 documents are agent output that was never verified against the file. One of them
@@ -22,13 +66,43 @@ leads to confirm, not as findings to act on. Grep before you fix. In particular,
 the claim of "9 review findings already live plus 5 new live defects" is unverified
 and the one claim that was checkable was false.
 
-**Pass 2 was started and did not finish.** All four re-baseline agents completed
-and their output is saved. The repair agent then died on a network error
-(ENOTFOUND) and produced nothing, so the Repair, Re-review and Completeness phases
-never ran. Workflow runs cannot be resumed across sessions, so do not try. Re-run
-the repair using these four documents as the input, and do not start the design
-work over: everything needed to write the merged stylesheet and the corrected edit
-list is already in them.
+### What was fixed after the design work shipped, and how it was found
+
+All of these came out of rendering a screen and measuring it. None was in any
+review document:
+
+- The pool call line broke into four lines 221px tall, because the 104px tick
+  strip left the text column 185px. Strip narrowed to 76, call cut 48px to 34px.
+- The tick strip was an empty box with no children. It now draws a check in CSS.
+- The pool goal took 25% of the screen before the first set. Own token at 24px.
+- The pool header was 20% of the screen with "of 57 min" wrapping. `nowrap` plus
+  smaller tokens brought it to about 110px.
+- `#pool` set the top safe-area inset **and** `.ptop` set `top:` to the same
+  value. They stack, so the header pinned 94px down on a notched phone and left a
+  94px band the deck scrolled through, with set text under the clock and battery.
+  The inset now lives only in the header.
+- `overflow-y:auto` makes the other axis compute to `auto`, so the deck could
+  scroll sideways. `overflow-x:hidden` added. It overflowed at 320px, which is
+  what Display Zoom reports.
+- `button.primary:active` swapped its background to `--accent-text`, a pale text
+  colour in dark mode, putting the label at 1.97:1. Brightness only now.
+- The three switches were 51 by 31, the only sub-44px targets in the app, two of
+  them pool controls. A `::before` grows the target to 71 by 45.
+- `onScroll` wrote `className` on every scroll event, invalidating the one element
+  carrying `blur(20px)` sixty times a second, with a single threshold that thrashes
+  on a rubber-band settle. Two thresholds, write only on the flip.
+- Night pool could not reach the toast, which mounts outside `#pool`, so a white
+  box appeared on a black deck. `poolnight` is mirrored on the body element.
+- History rows changed shape depending on title length, because `flex-basis:auto`
+  in a wrapping row makes an item jump to its own line instead of shrinking.
+
+### Pass 2's salvaged audits, still unspent
+
+`design/pass2-*.md` are four audit documents from a workflow whose repair step died.
+They were never verified and roughly one claim in five proved false, so treat them
+as leads to confirm rather than findings to act on. Grep before fixing anything
+from them. Their remaining value is the minors list; the blockers and the majors
+worth doing are done.
 
 - `design/pass2-README.md` is the index. Read the four in the order it gives.
 - `design/pass2-triage-47-findings.md` (59 items) triages every review finding
