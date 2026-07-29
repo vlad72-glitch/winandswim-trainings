@@ -318,7 +318,11 @@
     position:fixed; inset:0; z-index:var(--z-scrim); background:var(--scrim);
     opacity:0; pointer-events:none; transition:opacity var(--dur-mid) ease;
   }
-  .scrim.on{ opacity:1; pointer-events:auto; }
+  /* touch-action:none, or a drag started on the scrim is handed to the nearest
+     scrollable ancestor, which is the document. Open Retire on a long Library
+     list, start the dismiss drag just above the sheet, and the list scrolls
+     behind the sheet while the sheet stays put. */
+  .scrim.on{ opacity:1; pointer-events:auto; touch-action:none; }
   .sheet{
     position:fixed; left:0; right:0; bottom:0; z-index:var(--z-sheet);
     display:flex; flex-direction:column; overflow:hidden;
@@ -374,7 +378,13 @@
   /* --accent-fill is dark in both modes, so brightening is the visible
      direction. #0c5c86 on #1c1c1e is 2.34, and --accent-line is already
      #3b6d87, which clears 3:1 on card and on page. */
-  button.primary:active{background:var(--accent-text);filter:brightness(1.15);}
+  /* Brighten the fill, never swap it. --accent-text is a pale text colour in
+     dark mode, so using it as a background put white on #5cc4f5 at 1.97 and the
+     label of every primary action vanished while the finger was down. */
+  button.primary:active{filter:brightness(1.35);}
+  @media (prefers-color-scheme: dark){
+    button.primary:active{filter:brightness(1.5);}
+  }
   button.good{background:var(--good-fill);border-color:var(--good-fill);color:var(--on-good);}
   button.plain{background:transparent;border-color:transparent;color:var(--accent-text);}
   button.plain:active{background:var(--fill-3);}
@@ -417,6 +427,10 @@
      thing that says the row opens a picker, so draw it back with two
      gradients. No asset, no font. */
   select{
+    /* His focus names run long, "Turns, push-offs and underwater" wants 250px in
+       a 198px control, and renaming his library is not the fix. Elide instead of
+       cutting mid-word: tapping opens the native picker with the full text. */
+    text-overflow:ellipsis;
     padding-right:30px;
     background-image:linear-gradient(45deg,transparent 50%,var(--label-3) 50%),
                      linear-gradient(135deg,var(--label-3) 50%,transparent 50%);
@@ -441,9 +455,17 @@
      colour vision: the knob moves as well as the track filling. */
   .sw{
     flex:none;width:51px;min-width:51px;height:31px;min-height:31px;padding:0;
-    border:1px solid var(--sep-opaque);border-radius:var(--r-pill);
+    /* --sep-opaque against a light card is 1.71, and the rule on the input
+       border ten lines up rejects that same figure. --label-3 gives 5.13, so the
+       off state has a boundary you can actually see. */
+    border:1px solid var(--label-3);border-radius:var(--r-pill);
     background:var(--fill-1);position:relative;
   }
+  /* The switch itself is 51 by 31, the only thing in the app under the 44px
+     floor, and two of the three are pool controls reached for with wet hands.
+     This grows the target to 71 by 45 without moving the switch or touching the
+     engine. */
+  .sw::before{content:"";position:absolute;top:-7px;bottom:-7px;left:-10px;right:-10px;}
   .sw i{
     display:block;width:27px;height:27px;border-radius:var(--r-pill);
     background:#ffffff;box-shadow:0 1px 3px rgba(0,0,0,.25);
@@ -570,6 +592,10 @@
     border:var(--p-border) solid var(--p-ink);border-radius:var(--r-pool);
     font-size:var(--p-btn);box-shadow:none;
   }
+  /* --p-ink and --p-paper are the day literals on :root, and #pool.night cannot
+     reach a toast that mounts outside it, so night is mirrored on the body
+     element. The toast fires on Mark done, on Copy and on offline writes. */
+  body.poolnight .toast.pool{background:#000;color:#fff;border-color:#fff;}
 
   /* Stat strip. Was a 2x2 grid 202px tall, which pushed Start pool view off
      the first screen. One row of four recovers about 120px. */
@@ -585,6 +611,16 @@
         font-variant-numeric:tabular-nums;overflow-wrap:break-word;}
   .tile .sub{font-size:var(--fs-cap-2);color:var(--label-2);margin-top:1px;
         overflow-wrap:break-word;}
+  /* Four tiles across a 343px card leaves each one 85px, which split "1,708 m"
+     onto two lines and wrapped every caption. Two by two gives each about 170px,
+     and a stat that needs two lines to be read is not a stat. */
+  @media (max-width:420px){
+    .tiles{flex-wrap:wrap;}
+    .tile{flex:1 1 50%;min-width:50%;}
+    .tile:nth-child(3){border-left:0;}
+    .tile:nth-child(n+3){border-top:1px solid var(--sep);}
+    .tile .val{white-space:nowrap;overflow-wrap:normal;}
+  }
 
   .badge{font-size:var(--fs-cap);font-weight:600;line-height:1.4;
         background:var(--fill-3);color:var(--on-fill);
@@ -628,7 +664,11 @@
   .hrow{font-size:var(--fs-body);}
   .hdate{color:var(--label-2);white-space:nowrap;font-variant-numeric:tabular-nums;
         min-width:5.5em;flex-shrink:0;font-size:var(--fs-sub);}
-  .hmain{flex:1 1 auto;min-width:0;}
+  /* Two jobs. Basis 0 stops a long title jumping the whole block onto its own
+     line, which made the date sit beside the title on short rows and above it on
+     long ones. min-width then guarantees the title real room and pushes the
+     badges down to their own line instead of squeezing it to "Endura...". */
+  .hmain{flex:1 1 0;min-width:62%;}
   .htitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
   /* ---------- library ---------- */
@@ -653,16 +693,29 @@
     --pool-scale:1;
     --pool-target:104px;        /* state changing, wet finger. See the note below. */
     --pool-target-sm:76px;      /* reversible pool control */
-    --p-call:calc(48px * var(--pool-scale));
+    /* 34, not 48. The tick strip leaves the text about 217px on a 375px screen,
+       and 48px broke "Easy swim, own pace" into four lines 221px tall. 34px is
+       about 20 arcmin at 70cm, still well clear of the 16 arcmin floor. */
+    --p-call:calc(34px * var(--pool-scale));
+    /* The goal is read once, phone in hand, before anyone gets in the water, so
+       it is the one pool text exempt from the arm's length floor. At 30px it ate
+       25% of the screen before the first set. */
+    --p-goal:calc(24px * var(--pool-scale));
     --p-rest:calc(34px * var(--pool-scale));
     --p-qual:calc(30px * var(--pool-scale));
     --p-cue:calc(30px * var(--pool-scale));
-    --p-adv:calc(26px * var(--pool-scale));
+    /* 30, not 26. This one carries the Adv 1 and Adv 2 split, which is a
+       per-lane instruction read off the deck and shouted, and 26px measured
+       15.2 arcmin at 70cm, under the 16 arcmin floor this file cites as its own
+       standard. 30px is 17.6. */
+    --p-adv:calc(30px * var(--pool-scale));
+    /* 20px is 11.7 arcmin, below the floor on purpose. The role is a quiet
+       label, read once with the phone in hand, never shouted across water. */
     --p-role:calc(20px * var(--pool-scale));
     --p-clock:calc(56px * var(--pool-scale));
-    --p-drift:calc(28px * var(--pool-scale));
+    --p-drift:calc(22px * var(--pool-scale));
     --p-collapsed:calc(28px * var(--pool-scale));
-    --p-of:calc(24px * var(--pool-scale));
+    --p-of:calc(20px * var(--pool-scale));
     --p-btn:calc(30px * var(--pool-scale));    /* 17.6 arcmin at 70 cm */
     position:fixed;inset:0;z-index:var(--z-pool);
     overflow-y:auto;overscroll-behavior:contain;
@@ -672,13 +725,19 @@
     /* Water pools along the bezel and produces ghost touches there, and the
        iOS system gesture strips live in those edges. Nothing tappable within
        16px of any edge. A fixed box is laid out against the viewport, so it
-       names the insets itself. The top inset carries no extra padding: a
-       sticky child resolves its offset against the padding box, so anything
-       above it would be a gap the content scrolls through. */
-    padding:env(safe-area-inset-top)
+       names the insets itself.
+       The top inset belongs to the sticky header and not here. Setting it in
+       both places stacked them: the header pinned 94px down on a notched phone
+       and left a 94px band the deck scrolled through, so set text tracked under
+       the clock and the battery. */
+    padding:0
             max(var(--s-4),env(safe-area-inset-right))
             calc(env(safe-area-inset-bottom) + var(--s-6))
             max(var(--s-4),env(safe-area-inset-left));
+    /* overflow-y:auto makes the other axis compute to auto too, so one overrun
+       in the header would turn the deck into a sideways scroller under a wet
+       thumb. Measured at 320px, which is what Display Zoom reports. */
+    overflow-x:hidden;
   }
   /* Manual, off by default, never automatic. */
   #pool.night{
@@ -690,12 +749,18 @@
   /* A hard guard so no future rule can leak the glass register onto the deck. */
   #pool *{-webkit-backdrop-filter:none !important;backdrop-filter:none !important;}
 
-  /* 115px of the 763 usable: clock row 64, drift 36, padding and rule 15. */
+  /* This header can never scroll away, so its height has to be a measured
+     number rather than an estimate. Measured at 375px after the type changes
+     below: about 110px including the safe-area inset. */
   #pool .ptop{
-    position:sticky;top:env(safe-area-inset-top);z-index:2;
+    position:sticky;top:0;z-index:2;
     background:var(--p-paper);color:var(--p-ink);
     border-bottom:var(--p-border) solid var(--p-ink);
-    padding:var(--s-4) 0 8px;margin-bottom:var(--s-3);
+    /* The inset lives here, not on #pool. The header then pins flush to the top
+       of the overlay and its own padding holds the clock clear of the status
+       bar, leaving no band for content to scroll into. */
+    padding:calc(env(safe-area-inset-top) + var(--s-4)) 0 8px;
+    margin-bottom:var(--s-3);
   }
   #pool .ptop .prow{display:flex;align-items:center;gap:var(--s-3);}
   /* 64px is the absolute floor in pool view. Close is reversible and it has
@@ -708,16 +773,22 @@
      thing glare eats first, and it says nothing to a colour-blind eye. */
   #pool .clock.behind{background:var(--p-behind-fill);color:var(--p-behind-ink);
         border-radius:8px;padding:0 8px;}
-  #pool .of{font-size:var(--p-of);font-weight:600;flex:1 1 auto;}
+  /* "of 57 min" is three short words and must never wrap. It was breaking onto
+     two lines and dragging the header to a fifth of the screen. */
+  #pool .of{font-size:var(--p-of);font-weight:600;flex:1 1 auto;white-space:nowrap;}
   #pool .drift{font-size:var(--p-drift);font-weight:700;margin-top:2px;
         font-variant-numeric:tabular-nums;}
   #pool .drift.late{background:var(--p-behind-fill);color:var(--p-behind-ink);
         display:inline-block;padding:2px 12px;border-radius:var(--r-pill);}
-  #pool .pgoal{font-size:var(--p-qual);font-weight:600;line-height:1.35;
+  #pool .pgoal{font-size:var(--p-goal);font-weight:600;line-height:1.35;
         margin-bottom:var(--s-4);}
 
   #pool .pblk{
-    width:100%;                 /* a <button> shrinks to fit without this */
+    /* A button element keeps shrink-to-fit width even as a flex container, so
+       without this the collapsed rows came out 343, 272 and 199px wide. Do not
+       write a raw tag name in angle brackets here: the harness parses this file
+       and reads it as real markup. */
+    width:100%;
     border:var(--p-border) solid var(--p-ink);border-radius:var(--r-pool);
     background:var(--p-paper);color:var(--p-ink);
     padding:var(--s-4);margin-bottom:var(--s-3);
@@ -762,13 +833,19 @@
      mm) add in quadrature to 4.03 mm, and a 95% hit rate needs two times two
      sigma, so 16.1 mm, which is 102 CSS px. */
   #pool .ptick{
-    flex:none;width:var(--pool-target);min-width:var(--pool-target);
+    /* 76 wide, not 104. It stretches to the block's full height, so the target is
+       still around 76 by 279, far past any wet finger requirement, and the text
+       column gets back the 28px it needs to set the call line on two lines. */
+    flex:none;width:var(--pool-target-sm);min-width:var(--pool-target-sm);
     min-height:var(--pool-target);padding:0;
     border:var(--p-border) solid var(--p-ink);border-radius:var(--r-pool);
     background:var(--p-paper);color:var(--p-ink);
     display:flex;align-items:center;justify-content:center;
     font-size:52px;font-weight:700;line-height:1;
   }
+  /* The strip was an empty box, which tells nobody it is the thing to tap.
+     Drawn in CSS so the engine keeps writing no markup for it. */
+  #pool .ptick::after{content:"\2713";}
   #pool .ptick.on{background:var(--p-ink);color:var(--p-paper);}
   #pool .ptick:active{background:var(--p-ink);color:var(--p-paper);transform:none;}
   #pool button{min-height:var(--pool-target-sm);font-size:var(--p-btn);font-weight:700;
@@ -779,6 +856,10 @@
      changes state and the other does not. */
   #pool .pfoot{display:flex;gap:48px;margin-top:var(--s-6);}
   #pool .pfoot button{flex:1 1 0;}
+  /* Mark done writes to the database and has no undo on the deck, so it takes
+     the 104px state-changing floor rather than the 76px a reversible control
+     gets. Copy stays at 76. */
+  #pool .pfoot button.commit{min-height:var(--pool-target);}
 
   @media print{
     .topbar,.tabbar,.scrim,.sheet,#pool,button{display:none !important;}
@@ -892,8 +973,16 @@
   }catch(e){ /* private mode: the defaults are fine */ }
   var kbdUp = false;
   function paintBodyClass(){
-    document.body.className = ui.solid ? (kbdUp ? "solid kbd" : "solid")
-                                       : (kbdUp ? "kbd" : "");
+    // Built from a list rather than nested ternaries, because there are three
+    // independent flags now and the nested form clobbers whichever it forgets.
+    var c = [];
+    if (ui.solid) c.push("solid");
+    if (kbdUp) c.push("kbd");
+    // The pool toast mounts on <body>, outside #pool, so a class on #pool can
+    // never reach it. Without this, Night pool left a white toast box on a black
+    // deck in a dark hall.
+    if (ui.poolNight) c.push("poolnight");
+    document.body.className = c.join(" ");
   }
   function saveUi(){
     try{ localStorage.setItem(UI_KEY, JSON.stringify(ui)); }catch(e){}
@@ -951,9 +1040,18 @@
   // The large title scrolls with the content and the compact one fades in as it
   // goes. A plain scroll listener, no observers: document.documentElement is
   // outside what the engine is allowed to touch.
+  var barCompact = false;
   function onScroll(){
     var y = window.pageYOffset || 0;
-    TOPBAR.className = "topbar glass" + (y > 28 ? " compact" : "");
+    // Two thresholds, and only write on a flip. Assigning className on every
+    // scroll event invalidated style on the one element carrying blur(20px)
+    // sixty times a second, and a single threshold thrashes: the compact rule
+    // toggles backdrop-filter, so crossing it builds and destroys a full-width
+    // compositing layer, and a rubber-band settle parks the page right on it.
+    var want = barCompact ? y > 12 : y > 40;
+    if (want === barCompact) return;
+    barCompact = want;
+    TOPBAR.className = "topbar glass" + (barCompact ? " compact" : "");
   }
   window.addEventListener("scroll", onScroll);
   // The tab bar steps out of the way of the iOS keyboard. Not visualViewport:
@@ -2388,11 +2486,11 @@
     if (draft && draft.slot) slotSel.value = draft.slot;
 
     var endSel = h("select",{},
-      h("option",{value:"cooldown"},"Finish with a 5 min cool-down"),
-      h("option",{value:"game"},"Finish with a 10 min game"));
+      h("option",{value:"cooldown"},"5 min cool-down"),
+      h("option",{value:"game"},"10 min game"));
     endSel.value = (draft && draft.ending) || S.default_ending || "cooldown";
 
-    var focusSel = h("select",{}, [h("option",{value:""},"Let the app choose (recommended)")].concat(
+    var focusSel = h("select",{}, [h("option",{value:""},"App picks one")].concat(
       data.focuses.map(function(f){ return h("option",{value:f.key}, f.name); })));
     if (draft && draft.focus_key) focusSel.value = "";
 
@@ -2696,7 +2794,7 @@
     // The digits change every second, so a live region would announce a number
     // once a second. The reading is on the container instead.
     var clock = h("div",{class:"clock","aria-hidden":"true"},"0:00");
-    var drift = h("div",{class:"drift"},"tick a set to keep the clock honest");
+    var drift = h("div",{class:"drift"},"tick each set as you finish it");
     var plannedS = (sk.planned_minutes||60) * 60;
     // Progress is measured in minutes, not metres: the warm-up and the ending
     // have no metres at all and take a quarter of the hour between them.
@@ -2723,7 +2821,7 @@
       // is ticked, because before that there is nothing to compare against and
       // it would only be nagging.
       if (doneS <= 0){
-        drift.textContent = "tick a set to keep the clock honest";
+        drift.textContent = "tick each set as you finish it";
         drift.className = "drift";
       } else {
         var off = Math.round((el - expected)/60);
@@ -2749,7 +2847,7 @@
     // 48px apart. Mark done used to sit 10px from Copy, which is inside one
     // sigma of a wet finger, and only one of the two changes anything.
     pool.append(h("div",{class:"pfoot"},
-      h("button",{onclick:function(){ markStatus(sk,"done"); }},"Mark done"),
+      h("button",{class:"commit",onclick:function(){ markStatus(sk,"done"); }},"Mark done"),
       h("button",{onclick:function(){ copyText(asPlainText(sk)); }},"Copy")));
 
     pool.addEventListener("scroll", function(){ lastScrollAt = Date.now(); });
