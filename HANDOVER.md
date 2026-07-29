@@ -5,13 +5,22 @@ user-facing guide; this file is the build state.
 
 ## START HERE: one live bug, and where pass 2 got to
 
-**A one-word bug is live right now.** `index.html:2092` reads
-`style:{color:"var(--accent-ink)"}` and `--accent-ink` no longer exists: pass 1
-renamed it to `--accent-text` and missed this use site. The declaration is invalid
-at computed-value time, so the "Ask Claude for new sets" cue in the Library has no
-colour in the shipped app. Change it to `var(--accent-text)`. It was left unfixed
-on purpose, because a workflow was mid-flight anchoring edits to the current bytes.
-Fix it first, then bump `sw.js` and push.
+**There is no live bug. An earlier version of this file claimed there was, and it
+was wrong.** The pass 2 triage agent reported that `index.html:2092` still read
+`style:{color:"var(--accent-ink)"}` against a deleted token. It does not. That line
+reads `var(--accent-text)` and always did after pass 1. Verified two ways: `grep
+accent-ink index.html` returns nothing, and a sweep of every `var(--x)` used in the
+file against every `--x:` defined in it finds no undefined token at all.
+
+**The lesson, which matters more than the non-bug:** the four `design/pass2-*.md`
+documents are agent output that was never verified against the file. One of them
+led with a defect that did not exist. Spot-checking found the rest of its claims
+sound (`button.small{min-width:64px}`, `isLive` with 6 uses and no `isActive` in
+the live file, `.codeblock`, the four `.login` rules, the body safe-area padding,
+`--good-fill` and `--on-good` all present as described). Treat those documents as
+leads to confirm, not as findings to act on. Grep before you fix. In particular,
+the claim of "9 review findings already live plus 5 new live defects" is unverified
+and the one claim that was checkable was false.
 
 **Pass 2 was started and did not finish.** All four re-baseline agents completed
 and their output is saved. The repair agent then died on a network error
