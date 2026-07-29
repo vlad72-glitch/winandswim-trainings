@@ -7,125 +7,314 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="W&S Trainings">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0284c7">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>W&S Training Generator</title>
 <style>
+  /* ==========================================================================
+     Tokens, in three groups on purpose.
+
+     1. Structure, identical in every mode.
+     2. Themed surfaces, which follow the phone's light or dark setting.
+     3. Pool literals, further down, which follow nothing at all.
+
+     Pool view is the only screen read at arm's length in a bright hall with wet
+     hands, so it never themes and never goes dark. Everything else does.
+     ========================================================================== */
   :root{
-    --bg:#f3f6f8; --card:#ffffff; --ink:#13212b; --muted:#5f7280; --line:#e1e8ed;
-    --accent:#0284c7; --accent-ink:#075985; --accent-bg:#e0f2fe;
-    --good:#15803d; --good-bg:#dcfce7; --bad:#dc2626; --bad-bg:#fef2f2;
-    --warn:#b45309; --warn-bg:#fff7ed;
+    color-scheme: light dark;
+
+    --r-card:14px; --r-inner:10px; --r-ctl:11px; --r-pill:999px;
+    --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px; --s-6:24px;
+
+    /* 44px is the floor for anything you tap, not the target. A wet fingertip
+       spreads wider than a dry one and lands less precisely. */
+    --ctl-h:44px;
+    --ctl-h-lg:56px;
+
+    --dur-fast:120ms;
+    --ease-out:cubic-bezier(.2,.8,.3,1);
   }
+
+  /* ---------- themed surfaces: light ---------- */
+  :root{
+    --bg-grouped:#f2f2f7;
+    --bg-card:#ffffff;
+    --bg-nested:#f2f2f7;
+
+    /* Three label levels. Each one measured against white AND against the
+       grouped grey, because both sit behind text somewhere. */
+    --label:#13212b;      /* 16.4 on card, 14.7 on grouped */
+    --label-2:#414e58;    /* 8.55 / 7.66 */
+    --label-3:#636f7b;    /* 5.13 / 4.60, placeholders and decoration only */
+
+    --sep:rgba(60,60,67,.29);
+    --sep-opaque:#c6c6c8;
+    --fill-3:rgba(118,118,128,.12);
+    --fill-4:rgba(116,116,128,.08);
+
+    /* The accent is split by job. White on #0284c7 is 4.10, which fails AA, so
+       every primary button in the old design was below the standard. #0284c7
+       stays for glyphs and thin lines. Fills and coloured text use the darker
+       one, where white reaches 7.56. */
+    --accent:#0284c7;
+    --accent-text:#075985;
+    --accent-fill:#075985;
+    --accent-tint:#e0f2fe;
+    --accent-line:#9ecfea;
+
+    --good:#155c33; --good-fill:#155c33; --good-tint:#dcfce7; --good-line:#8fd0a6;
+    --warn:#743e00; --warn-tint:#fff7ed; --warn-line:#e3b478;
+    --bad:#9f1a1a;  --bad-tint:#fef2f2;  --bad-line:#e8a3a3;
+
+    /* Split by job, the same way the accent is. --good is for TEXT on a tint,
+       so in dark mode it goes pale. --good-fill is for a filled button, so it
+       stays dark in both modes. Using the pale one as a fill is readable but
+       wrong: it makes Save the brightest thing on the card and shouts louder
+       than the action you actually want. */
+    --on-accent:#ffffff; --on-good:#ffffff;
+
+    --shadow-card:0 1px 2px rgba(16,42,58,.05);
+  }
+
+  /* ---------- themed surfaces: dark ---------- */
+  @media (prefers-color-scheme: dark){
+    :root{
+      /* The inversion that catches people out: grouped is lighter than card in
+         light mode, and darker than card in dark mode. */
+      --bg-grouped:#000000;
+      --bg-card:#1c1c1e;
+      --bg-nested:#2c2c2e;
+
+      --label:#ffffff;      /* 17.0 on card, 21.0 on grouped */
+      --label-2:#b0b9c1;    /* 8.55 card, 7.01 nested */
+      --label-3:#949ea8;    /* 6.25 / 5.12 */
+
+      --sep:rgba(84,84,88,.65);
+      --sep-opaque:#404044;
+      --fill-3:rgba(118,118,128,.24);
+      --fill-4:rgba(118,118,128,.18);
+
+      --accent:#5cc4f5; --accent-text:#5cc4f5; --accent-fill:#0c5c86;
+      --accent-tint:#213844; --accent-line:#3b6d87;
+
+      --good:#8ce8b2; --good-fill:#14663a; --good-tint:#2e4037; --good-line:#4c7a5e;
+      --warn:#f5c377; --warn-tint:#42382b; --warn-line:#7d6640;
+      --bad:#ffada8;  --bad-tint:#453434;  --bad-line:#8a5b58;
+
+      /* Both fills stay dark here, so both keep white ink. */
+      --on-accent:#ffffff; --on-good:#ffffff;
+
+      --shadow-card:none;   /* dark mode separates by fill, not by shadow */
+    }
+  }
+
+  /* Reduce Transparency and Increase Contrast are two different requests, so
+     they get two different blocks. Bundling them is how light-mode label
+     colours end up painted on a dark background. */
+  @media (prefers-contrast: more), (prefers-reduced-transparency: reduce){
+    :root{ --sep:var(--sep-opaque); --shadow-card:none; }
+  }
+  @media (prefers-contrast: more){
+    :root{ --label:#000000; --label-2:#2b343c; --label-3:#4a545e; }
+  }
+  @media (prefers-color-scheme: dark) and (prefers-contrast: more){
+    :root{ --label:#ffffff; --label-2:#dfe4e8; --label-3:#b9c1c8; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{
+      transition-duration:.01ms !important; animation-duration:.01ms !important;
+    }
+  }
+
+  /* ==========================================================================
+     Base
+     ========================================================================== */
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    background:var(--bg); color:var(--ink); line-height:1.45; -webkit-text-size-adjust:100%;
+    background:var(--bg-grouped); color:var(--label); line-height:1.45;
+    -webkit-text-size-adjust:100%;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
   .wrap{max-width:860px;margin:0 auto;padding:14px 14px 60px;}
   header{display:flex;align-items:center;gap:10px;padding:10px 4px;flex-wrap:wrap;}
   header h1{font-size:1.15rem;margin:0;font-weight:700;display:flex;align-items:center;gap:7px;}
   header .spacer{flex:1;}
+
+  /* ==========================================================================
+     Controls
+
+     Everything tappable clears 44px. The old buttons were 39px, and the rep
+     steppers were 27px tall by 55px wide, which is a coin flip with a wet hand.
+     Feedback is on :active, not :hover: a phone has no hover, and iOS leaves a
+     hover state stuck on the last thing you touched.
+     ========================================================================== */
   nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 2px 14px;}
-  nav.tabs button{border-radius:999px;padding:6px 14px;font-size:.92rem;}
-  nav.tabs button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  nav.tabs button{border-radius:var(--r-pill);padding:0 16px;font-size:.92rem;}
+  nav.tabs button.active{
+    background:var(--accent-fill);border-color:var(--accent-fill);color:var(--on-accent);
+  }
   button{
-    font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);
-    border-radius:9px;padding:7px 12px;transition:background .12s,border-color .12s;
+    font:inherit;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    min-height:var(--ctl-h); padding:0 14px;
+    border:1px solid var(--sep); background:var(--bg-card); color:var(--label);
+    border-radius:var(--r-ctl);
+    -webkit-tap-highlight-color:transparent;
+    transition:background var(--dur-fast) var(--ease-out),
+               transform var(--dur-fast) var(--ease-out);
   }
-  button:hover{background:#eef3f6;}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
-  button.primary:hover{background:#0369a1;}
-  button.good{background:var(--good);border-color:var(--good);color:#fff;}
-  button.ghost{background:transparent;border-color:transparent;color:var(--muted);padding:5px 8px;}
-  button.ghost:hover{background:#e9eef1;color:var(--ink);}
+  button:active{background:var(--fill-3);transform:scale(.97);}
+  @media (hover:hover){ button:hover{background:var(--fill-4);} }
+  button.primary{background:var(--accent-fill);border-color:var(--accent-fill);color:var(--on-accent);}
+  button.primary:active{background:var(--accent-text);filter:brightness(1.15);}
+  button.good{background:var(--good-fill);border-color:var(--good-fill);color:var(--on-good);}
+  button.ghost{background:transparent;border-color:transparent;color:var(--label-2);}
+  button.ghost:active{background:var(--fill-3);color:var(--label);}
   button.danger{color:var(--bad);border-color:transparent;background:transparent;}
-  button.danger:hover{background:var(--bad-bg);}
-  button:disabled{opacity:.5;cursor:default;}
-  button.small{padding:3px 8px;font-size:.8rem;border-radius:7px;}
-  button.big{padding:16px 22px;font-size:1.1rem;font-weight:600;border-radius:12px;}
+  button.danger:active{background:var(--bad-tint);}
+  button:disabled{opacity:.4;cursor:default;transform:none;}
+  /* Still a 44px target, just a smaller label on it. */
+  button.small{font-size:.85rem;padding:0 12px;min-width:64px;border-radius:var(--r-inner);}
+  button.big{min-height:var(--ctl-h-lg);padding:0 22px;font-size:1.1rem;font-weight:600;border-radius:var(--r-card);}
+
   input,select,textarea{
-    font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 10px;
+    font:inherit;color:var(--label);background:var(--bg-card);
+    border:1px solid var(--sep);border-radius:var(--r-ctl);
+    min-height:var(--ctl-h);padding:0 12px;
   }
-  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-bg);border-color:var(--accent);}
-  select.small,input.small{padding:4px 8px;font-size:.85rem;}
-  textarea{width:100%;min-height:70px;resize:vertical;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px;
-    box-shadow:0 1px 2px rgba(16,42,58,.04);}
+  textarea{width:100%;min-height:88px;padding:10px 12px;resize:vertical;line-height:1.45;}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent);}
+  select.small,input.small{font-size:.85rem;padding:0 10px;}
+  input::placeholder,textarea::placeholder{color:var(--label-3);}
+
+  /* ==========================================================================
+     Surfaces
+     ========================================================================== */
+  .card{
+    background:var(--bg-card);border:1px solid var(--sep);border-radius:var(--r-card);
+    padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow-card);
+  }
   .card h2{margin:0 0 2px;font-size:1.15rem;}
   .row{display:flex;align-items:center;gap:10px;}
   .row.wrap{flex-wrap:wrap;}
-  .muted{color:var(--muted);} .small{font-size:.85rem;} .tiny{font-size:.78rem;}
+  .muted{color:var(--label-2);} .small{font-size:.85rem;} .tiny{font-size:.78rem;}
   .stack>*+*{margin-top:10px;}
-  .section-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px;}
-  .err{background:var(--bad-bg);color:var(--bad);border:1px solid #f3c2c2;border-radius:9px;padding:8px 10px;font-size:.9rem;margin-top:8px;}
-  .banner{background:var(--warn-bg);color:var(--warn);border:1px solid #fcd9a8;border-radius:9px;padding:8px 10px;font-size:.88rem;margin-bottom:12px;}
-  .banner.ok{background:var(--good-bg);color:var(--good);border-color:#b7e4c3;}
-  .banner.info{background:var(--accent-bg);color:var(--accent-ink);border-color:#bae0f5;}
+  .section-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--label-2);margin:0 0 8px;}
   .center{text-align:center;}
-  .empty{text-align:center;color:var(--muted);padding:26px 10px;}
+  .empty{text-align:center;color:var(--label-2);padding:26px 10px;}
+  /* Was an inline #f5f8fa, which is near white behind white text in dark mode. */
+  .codeblock{
+    background:var(--bg-nested);border:1px solid var(--sep);
+    padding:10px;border-radius:var(--r-inner);overflow-x:auto;
+  }
+
+  /* The login fields used to size themselves to their placeholder text, so on a
+     phone they sat at about 60% of the width with the button stranded beside
+     them. One screen, so the rule is scoped to it. */
+  .login input{width:100%;}
+  .login .row{display:block;}
+  .login .row button{width:100%;min-height:var(--ctl-h-lg);}
+
+  .err{background:var(--bad-tint);color:var(--bad);border:1px solid var(--bad-line);border-radius:var(--r-inner);padding:8px 10px;font-size:.9rem;margin-top:8px;}
+  .banner{background:var(--warn-tint);color:var(--warn);border:1px solid var(--warn-line);border-radius:var(--r-inner);padding:8px 10px;font-size:.88rem;margin-bottom:12px;}
+  .banner.ok{background:var(--good-tint);color:var(--good);border-color:var(--good-line);}
+  .banner.info{background:var(--accent-tint);color:var(--accent-text);border-color:var(--accent-line);}
+
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;}
-  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;}
-  .tile .lbl{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
-  .tile .val{font-size:1.35rem;font-weight:700;margin-top:2px;}
-  .tile .sub{font-size:.78rem;color:var(--muted);margin-top:2px;}
-  .badge{font-size:.7rem;font-weight:600;background:#eef3f6;color:var(--muted);padding:1px 7px;border-radius:999px;white-space:nowrap;}
-  .badge.warn{background:var(--warn-bg);color:var(--warn);}
-  .badge.ok{background:var(--good-bg);color:var(--good);}
-  .badge.accent{background:var(--accent-bg);color:var(--accent-ink);}
-  /* session blocks */
-  .blk{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--card);}
-  .blk .role{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+  .tile{background:var(--bg-card);border:1px solid var(--sep);border-radius:var(--r-card);padding:12px 14px;}
+  .tile .lbl{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--label-2);}
+  .tile .val{font-size:1.35rem;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums;}
+  .tile .sub{font-size:.78rem;color:var(--label-2);margin-top:2px;}
+
+  .badge{font-size:.7rem;font-weight:600;background:var(--fill-3);color:var(--label-2);padding:2px 8px;border-radius:var(--r-pill);white-space:nowrap;}
+  .badge.warn{background:var(--warn-tint);color:var(--warn);}
+  .badge.ok{background:var(--good-tint);color:var(--good);}
+  .badge.accent{background:var(--accent-tint);color:var(--accent-text);}
+
+  /* ---------- session blocks ---------- */
+  .blk{border:1px solid var(--sep);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--bg-card);}
+  .blk .role{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--label-2);}
   .blk .line{font-size:1.08rem;font-weight:650;margin-top:3px;}
-  .blk .cue{color:var(--accent-ink);font-size:.94rem;margin-top:5px;}
-  .blk .watch{color:var(--muted);font-size:.86rem;margin-top:4px;}
+  .blk .cue{color:var(--accent-text);font-size:.94rem;margin-top:5px;}
+  .blk .watch{color:var(--label-2);font-size:.86rem;margin-top:4px;}
   .blk .adv{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
-  .blk .adv span{font-size:.8rem;background:#f5f8fa;border:1px solid var(--line);border-radius:7px;padding:3px 8px;}
-  .blk .meta{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;}
-  .goalbox{background:var(--accent-bg);border:1px solid #bae0f5;border-radius:12px;padding:12px 14px;margin-bottom:12px;}
-  .goalbox .lbl{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent-ink);}
-  .goalbox .txt{margin-top:3px;font-size:1rem;}
-  /* history */
-  .hrow{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:.92rem;cursor:pointer;}
+  .blk .adv span{font-size:.8rem;background:var(--bg-nested);border:1px solid var(--sep);border-radius:7px;padding:3px 8px;}
+  .blk .meta{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .goalbox{background:var(--accent-tint);border:1px solid var(--accent-line);border-radius:12px;padding:12px 14px;margin-bottom:12px;}
+  .goalbox .lbl{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent-text);}
+  .goalbox .txt{margin-top:3px;font-size:1rem;color:var(--label);}
+
+  /* ---------- history ---------- */
+  .hrow{display:flex;align-items:center;gap:10px;padding:0 4px;min-height:var(--ctl-h);border-bottom:1px solid var(--sep);font-size:.92rem;cursor:pointer;-webkit-tap-highlight-color:transparent;}
   .hrow:last-child{border-bottom:none;}
-  .hrow:hover{background:#f7fafb;}
-  .hdate{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;width:92px;flex-shrink:0;}
+  .hrow:active{background:var(--fill-3);}
+  @media (hover:hover){ .hrow:hover{background:var(--fill-4);} }
+  .hdate{color:var(--label-2);white-space:nowrap;font-variant-numeric:tabular-nums;width:92px;flex-shrink:0;}
   .hmain{flex:1;min-width:0;}
   .htitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  /* library */
-  .lrow{display:flex;align-items:flex-start;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:.9rem;}
+
+  /* ---------- library ---------- */
+  .lrow{display:flex;align-items:flex-start;gap:10px;padding:9px 4px;border-bottom:1px solid var(--sep);font-size:.9rem;}
   .lrow:last-child{border-bottom:none;}
   .lrow .lmain{flex:1;min-width:0;}
   .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
   .filters input[type=search]{flex:1;min-width:130px;}
-  .bar{height:8px;background:#eef3f6;border-radius:999px;overflow:hidden;}
+  .bar{height:8px;background:var(--fill-3);border-radius:var(--r-pill);overflow:hidden;}
   .bar>i{display:block;height:100%;background:var(--accent);}
-  /* ---------- pool view: bright hall, wet fingers ---------- */
-  #pool{position:fixed;inset:0;background:#fff;color:#000;z-index:50;overflow-y:auto;
-        padding:calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 20px);}
-  #pool .ptop{display:flex;align-items:center;gap:10px;position:sticky;top:0;background:#fff;
-        padding:6px 0 10px;border-bottom:2px solid #000;margin-bottom:12px;}
+
+  /* ==========================================================================
+     Pool view: bright hall, wet fingers, phone at arm's length.
+
+     Literal black on literal white, never themed. Dark mode does not reach in
+     here: a large light field constricts the pupil, which lifts what you can
+     resolve, and a droplet on a dark screen scatters as a bright point.
+     ========================================================================== */
+  #pool{
+    position:fixed;inset:0;z-index:200;overflow-y:auto;
+    color-scheme:light;
+    --p-ink:#000; --p-paper:#fff;
+    --p-done-fill:#e8ecef;    /* black on it is 17.7, so it decorates only */
+    background:var(--p-paper);color:var(--p-ink);
+    padding:calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 20px);
+  }
+  #pool .ptop{display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--p-paper);
+        padding:6px 0 10px;border-bottom:3px solid var(--p-ink);margin-bottom:12px;}
   #pool .clock{font-size:1.9rem;font-weight:800;font-variant-numeric:tabular-nums;}
-  #pool .clock.behind{color:var(--bad);}
+  /* Behind schedule inverts rather than turning red. Red on white is the one
+     thing glare eats first, and it says nothing to a colour-blind eye. */
+  #pool .clock.behind{background:var(--p-ink);color:var(--p-paper);border-radius:8px;padding:0 8px;}
   #pool .pgoal{font-size:1.1rem;font-weight:600;margin-bottom:14px;}
-  #pool .pblk{border:3px solid #000;border-radius:14px;padding:14px;margin-bottom:12px;min-height:56px;cursor:pointer;}
-  #pool .pblk.done{border-color:#9aa7ae;color:#9aa7ae;background:#f7f9fa;}
+  #pool .pblk{border:3px solid var(--p-ink);border-radius:16px;padding:14px;margin-bottom:12px;min-height:56px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  /* Done is marked with a word and a tick, on a fill dark enough to see. The
+     old pale grey on near white measured 2.34, which is unreadable at arm's
+     length, and going pale is a colour-only signal in any case. */
+  #pool .pblk.done{background:var(--p-done-fill);border-color:var(--p-ink);color:var(--p-ink);}
+  #pool .pblk.done .prole::after{content:" ✓ done";font-weight:800;}
+  #pool .pblk:active{background:var(--p-done-fill);}
   #pool .pblk .prole{font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;}
   #pool .pblk .pline{font-size:1.85rem;font-weight:800;line-height:1.2;margin-top:4px;}
   #pool .pblk .pcue{font-size:1.25rem;margin-top:8px;font-weight:600;}
   #pool .pblk .padv{font-size:1.05rem;margin-top:8px;}
-  #pool button{min-height:52px;font-size:1.05rem;font-weight:700;border:2px solid #000;}
+  #pool button{min-height:64px;font-size:1.05rem;font-weight:700;
+        border:3px solid var(--p-ink);background:var(--p-paper);color:var(--p-ink);border-radius:12px;}
+  #pool button:active{background:var(--p-done-fill);transform:none;}
+  /* A hard guard so no future rule can leak the glass register onto the deck. */
+  #pool *{-webkit-backdrop-filter:none !important;backdrop-filter:none !important;}
+
   @media (max-width:560px){
     .wrap{padding:10px 10px 60px;}
     #pool .pblk .pline{font-size:1.55rem;}
   }
   @media print{
     nav.tabs,button,header .spacer{display:none !important;}
-    body{background:#fff;} .card,.blk{box-shadow:none;border-color:#999;}
+    body{background:#fff;color:#000;}
+    .card,.blk{box-shadow:none;border-color:#999;}
   }
 </style>
 </head>
@@ -494,10 +683,17 @@
     return Infinity;
   }
 
+  // A set is live only if BOTH flags say so. Retiring one writes active:false
+  // and leaves status alone, so anything that checks status by itself keeps
+  // listing and counting retired sets as if they were still in play. The
+  // generator got this right and five places in the views did not, so the rule
+  // lives in one function now and everything calls it.
+  function isLive(x){
+    return x.active !== false && (x.status || "active") === "active";
+  }
   function activeLibrary(group){
     return data.library.filter(function(x){
-      return x.active !== false && (x.status || "active") === "active" &&
-             (x.group_level || "advanced") === group;
+      return isLive(x) && (x.group_level || "advanced") === group;
     });
   }
 
@@ -1483,7 +1679,7 @@
     var email = h("input",{type:"email",placeholder:"email",autocomplete:"username"});
     var pass  = h("input",{type:"password",placeholder:"password",autocomplete:"current-password"});
     function go(){ signIn(email.value, pass.value); }
-    APP.append(h("div",{class:"card stack",style:{maxWidth:"420px",margin:"40px auto"}},
+    APP.append(h("div",{class:"card stack login",style:{maxWidth:"420px",margin:"40px auto"}},
       h("h2",null,"Log in"),
       h("p",{class:"muted small"},"Training generator for the Win and Swim advanced adults group."),
       email, pass,
@@ -1499,7 +1695,7 @@
       h("p",{class:"muted"},"You are logged in as ", h("b",null,session.user.email),
         ", but there is no coach row for you, so the database will not show you anything."),
       h("p",{class:"small muted"},"Fix it in the Supabase SQL Editor (SETUP.md step 4):"),
-      h("pre",{class:"small",style:{background:"#f5f8fa",padding:"10px",borderRadius:"9px",overflowX:"auto"}},
+      h("pre",{class:"small codeblock"},
         "insert into public.tr_coaches (id, display_name)\nvalues ('" + session.user.id + "', 'Your name');"),
       h("div",{class:"row"},
         h("button",{class:"primary",onclick:function(){ boot(); }},"I have done that, retry"),
@@ -1668,7 +1864,7 @@
       note,
       h("div",{class:"row"},
         h("button",{onclick:function(){ saveNote(sk, note.value); }},"Save note"),
-        h("span",{class:"tiny muted"},"Two 5s in a row and the next session drops 100 m. Two 1s and it goes up.")));
+        h("span",{class:"tiny muted"},"Saved with the session, so you can look back at what landed hard.")));
   }
   async function markStatus(sk, status){
     if (!sk.id) return;
@@ -1838,7 +2034,7 @@
       var S = data.settings || defaultSettings();
       var term = lib.q.toLowerCase();
       var rows = data.library.filter(function(x){
-        if ((x.status||"active") !== "active") return false;
+        if (!isLive(x)) return false;
         if (lib.role && x.role !== lib.role) return false;
         if (lib.focus && (x.focus_tags||[]).indexOf(lib.focus) === -1) return false;
         if (term && (x.name + " " + x.structure + " " + (x.cue||"")).toLowerCase().indexOf(term) === -1) return false;
@@ -1848,7 +2044,7 @@
       if (!rows.length){ box.append(h("div",{class:"empty"},"Nothing matches.")); return; }
       var roleCounts = {};
       data.library.forEach(function(x){
-        if ((x.status||"active") !== "active" || x.active === false) return;
+        if (!isLive(x)) return;
         var k = x.role + (x.whole_body ? ":whole" : "");
         roleCounts[k] = (roleCounts[k]||0)+1;
       });
@@ -1878,7 +2074,7 @@
     APP.append(h("div",{class:"card stack"},
       h("div",{class:"row wrap"},
         h("h2",{style:{flex:"1"}},"Library"),
-        h("span",{class:"badge"}, data.library.filter(function(x){ return (x.status||"active")==="active"; }).length + " sets"),
+        h("span",{class:"badge"}, data.library.filter(isLive).length + " sets"),
         h("button",{ class:"primary small", disabled: busy || offline,
           onclick:function(){ growLibrary(); } }, "Ask Claude for new sets")),
       h("div",{class:"small muted"},
@@ -1956,7 +2152,7 @@
     var S = data.settings || defaultSettings();
     var counts = {};
     data.library.forEach(function(x){
-      if ((x.status||"active")==="active" && x.active !== false) counts[x.role] = (counts[x.role]||0)+1;
+      if (isLive(x)) counts[x.role] = (counts[x.role]||0)+1;
     });
     var need = { main_set:10, technique_drill:10, kick_set:8, pull_set:8, sprint_set:6,
                  skill_set:6, turns:6, open_water:4, activation:3, cooldown:3 };
@@ -1983,7 +2179,7 @@
       tile("Sessions", String(data.sessions.length), "saved in total"),
       tile("Average", fmtM(avgVol), "last " + vols.length + " sessions"),
       tile("Written by Claude", aiCount + " of " + recent.length, "the rest came from the library"),
-      tile("Library", String(data.library.filter(function(x){ return (x.status||"active")==="active"; }).length), "active sets")
+      tile("Library", String(data.library.filter(isLive).length), "active sets")
     ));
 
     var fbox = h("div",{class:"card stack"}, h("div",{class:"section-label"},"Focus balance, last " + recent.length + " sessions"));
@@ -2011,13 +2207,13 @@
       APP.append(tb);
     }
 
-    var stale = data.library.filter(function(x){ return (x.status||"active")==="active" && !x.last_used_on; });
+    var stale = data.library.filter(function(x){ return isLive(x) && !x.last_used_on; });
     var over = data.library.filter(function(x){ return (x.times_used||0) >= 4; })
       .sort(function(a,b){ return (b.times_used||0)-(a.times_used||0); }).slice(0,8);
     APP.append(h("div",{class:"card stack"},
       h("div",{class:"section-label"},"Sets you have never used"),
       h("div",{class:"small muted"}, stale.length + " of " +
-        data.library.filter(function(x){ return (x.status||"active")==="active"; }).length + " have never come up."),
+        data.library.filter(isLive).length + " have never come up."),
       over.length ? h("div",{class:"section-label",style:{marginTop:"10px"}},"Most used") : null,
       over.map(function(x){
         return h("div",{class:"row"},
