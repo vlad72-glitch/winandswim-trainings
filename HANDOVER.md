@@ -3,6 +3,50 @@
 Read this first if you are picking the project up fresh. `SETUP.md` is the
 user-facing guide; this file is the build state.
 
+## START HERE: one live bug, and where pass 2 got to
+
+**A one-word bug is live right now.** `index.html:2092` reads
+`style:{color:"var(--accent-ink)"}` and `--accent-ink` no longer exists: pass 1
+renamed it to `--accent-text` and missed this use site. The declaration is invalid
+at computed-value time, so the "Ask Claude for new sets" cue in the Library has no
+colour in the shipped app. Change it to `var(--accent-text)`. It was left unfixed
+on purpose, because a workflow was mid-flight anchoring edits to the current bytes.
+Fix it first, then bump `sw.js` and push.
+
+**Pass 2 was started and did not finish.** The workflow ran the four re-baseline
+agents; three completed and their output is saved. The Repair, Re-review and
+Completeness phases never ran. Workflow runs cannot be resumed across sessions, so
+do not try: re-run the repair using these three documents as the input.
+
+- `design/pass2-README.md` is the index.
+- `design/pass2-triage-47-findings.md` triages every review finding against the
+  post-pass-1 file. **This supersedes `DESIGN-REVIEW.md` where they disagree.**
+- `design/pass2-rebaseline-markup-edits.md` re-anchors the 24 draft edits. 17 still
+  apply, 3 are superseded, 2 partly, 2 need restructuring.
+- `design/pass2-rebaseline-stylesheet-merge.md` reconciles the draft CSS against
+  the live one. 41 of 44 token names already match with identical values.
+- The harness extension agent did not finish. That work has to be redone, and it
+  is the prerequisite for pass 2: `verify.js` still cannot fail when the interface
+  breaks, and `renderPool` is not reachable from `WSTRAIN_ENGINE` at all.
+
+**Four traps, all of which make things worse if applied blind:**
+
+1. Do not paste `design/draft-stylesheet.css`. It re-bundles the accessibility
+   media queries, which puts `#000000` labels on `#1c1c1e` cards at 1.23:1 in dark
+   mode. That is blocker 3, which pass 1 already fixed.
+2. Do not apply major 10's `--on-good:#0d2f1c`. Against the `--good-fill:#14663a`
+   that actually shipped it computes to 2.08:1. The live pairing is 7.02:1.
+3. The draft edits call `isActive()`. The live helper is `isLive` at
+   `index.html:691`. Applying them as written throws on every Library paint.
+4. The draft drops `button.small{min-width:64px}`, `.codeblock`, the `.login`
+   rules, and `body{padding:env(safe-area-inset-*)}`. All four are live pass 1
+   fixes. The first one is a 44px regression on the five difficulty buttons.
+
+**Scope is bigger than the review says.** 9 findings it framed as future risks are
+already live defects, and the triage found 5 more plus 3 hazards the review never
+contained. Also, the line further down this file that says "None of these are
+fixed" is no longer true: 2 are fully fixed and 5 are half fixed.
+
 ## The redesign is half done, and the half that is left is specified
 
 A full iOS restructure was designed and reviewed. **Pass 1 is live.** Pass 2 is
