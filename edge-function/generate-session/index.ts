@@ -25,7 +25,11 @@ const MODEL = "claude-opus-5";
 // so everything here is budgeted to 40 s. Otherwise the app shows "Claude took
 // too long", Vlad presses again, and he is billed twice for work he never sees.
 const TOTAL_BUDGET_MS = 40_000;
-const MAX_CALLS_PER_COACH_PER_DAY = 25;
+// A whole-team cap, not one each. tr_ai_generations does not record who asked,
+// so the count below cannot be narrowed to a single coach. That is the safer
+// shape anyway: a stuck button costs at most 25 calls a day across all three
+// coaches, rather than 25 each.
+const MAX_CALLS_PER_DAY = 25;
 
 // Rough cost, only so the app can show a month-to-date number.
 const USD_PER_MTOK_IN = 5, USD_PER_MTOK_OUT = 25;
@@ -371,10 +375,10 @@ Deno.serve(async (req) => {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   try {
     const cnt = await rest(
-      `tr_ai_generations?created_at=gte.${since}&select=id&limit=${MAX_CALLS_PER_COACH_PER_DAY + 1}`,
+      `tr_ai_generations?created_at=gte.${since}&select=id&limit=${MAX_CALLS_PER_DAY + 1}`,
     );
     const rows = cnt.ok ? await cnt.json() : [];
-    if (Array.isArray(rows) && rows.length > MAX_CALLS_PER_COACH_PER_DAY) {
+    if (Array.isArray(rows) && rows.length > MAX_CALLS_PER_DAY) {
       return json({ ok: false, code: "daily_cap" }, 429);
     }
   } catch { /* the cap is a courtesy, not a gate */ }
@@ -426,7 +430,12 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 8000,
+        // Thinking is on by default on this model and shares this budget with
+        // the reply, so the number has to cover both. A session card is around
+        // 1,300 tokens of JSON and unused tokens cost nothing, so there is no
+        // reason to run it close: at 8,000 a long think could cut the JSON off
+        // half written.
+        max_tokens: 16000,
         // Thinking stays on. Turning it off on this model can leak internal
         // tags into the text, and a lower effort is the cheaper way to stay
         // inside the time budget.
@@ -459,6 +468,11 @@ Deno.serve(async (req) => {
       // checked before reading the text.
       if (msg?.stop_reason === "refusal") {
         errCode = "refused";
+      } else if (msg?.stop_reason === "max_tokens") {
+        // The reply was cut off, so the JSON is half written. Parsing it would
+        // fail and be logged as bad_shape, which points the blame at Claude
+        // instead of at the ceiling above.
+        errCode = "truncated";
       } else {
         const text = (msg?.content ?? [])
           .filter((b: any) => b?.type === "text")
