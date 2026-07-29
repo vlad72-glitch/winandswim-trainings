@@ -171,11 +171,16 @@ coaching notes instead of the library.
 2. Add some credit under **Plans and billing**. Five euros lasts months: a
    generated session costs about five to ten cents, so three classes a week is
    well under a euro a month.
-3. In Supabase: **Project Settings** → **Edge Functions** → **Secrets** →
-   **Add new secret**.
+3. In Supabase: **Edge Functions** in the left sidebar, then the **Secrets**
+   tab, then **Add new secret**. It is not under Project Settings, whatever you
+   may remember. Straight there:
+   `https://supabase.com/dashboard/project/wueuvwutbeqtyuhmhglh/functions/secrets`
    - Name: `ANTHROPIC_API_KEY`
    - Value: paste the key
    - Save.
+
+Do not confuse this with **Project Settings** → **Integrations** → **Vault**.
+Vault is for database secrets and the function cannot read it.
 
 The key lives only here. It is never in the web page, never in GitHub, and the
 app never sees it. Your phone asks the Supabase function, and the function talks
