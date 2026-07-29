@@ -3,6 +3,47 @@
 Read this first if you are picking the project up fresh. `SETUP.md` is the
 user-facing guide; this file is the build state.
 
+## The redesign is half done, and the half that is left is specified
+
+A full iOS restructure was designed and reviewed. **Pass 1 is live.** Pass 2 is
+not started, and everything it needs is written down in `design/`:
+
+- `design/DESIGN-SPEC.md` is the full specification: token groups, the two
+  visual registers, type scale, per screen layout, components, motion, and a
+  DO NOT TOUCH list. Every colour in it was measured, not guessed.
+- `design/DESIGN-REVIEW.md` is 7 blockers, 24 majors and 16 minors found by
+  three independent reviewers on the draft implementation, each with a fix, plus
+  the 14 risk decisions the spec carries. **None of these are fixed.** Read it
+  before writing a line of pass 2.
+- `design/draft-stylesheet.css` and `design/draft-markup-edits.json` are that
+  reviewed-but-unapplied draft. Do not paste them in. They are written for
+  markup that does not exist yet and they contain every one of those blockers.
+
+**Pass 1, live now:** the token system with light and dark palettes, dark mode
+from `prefers-color-scheme`, `prefers-contrast` and
+`prefers-reduced-transparency` in separate blocks, every tap target at 44px or
+more, `:active` feedback with hover behind `@media (hover:hover)`, and four real
+bugs fixed. It was written fresh against the existing markup rather than taken
+from the draft, which is why none of the blockers reached the app.
+
+The four bugs: primary buttons failed AA at 4.10:1 and are now 7.56:1; retired
+library sets were counted and listed as active in five places and now go through
+one `isLive()` predicate; the pool done state was 2.34:1 and colour-only, and is
+now 17.68:1 with a "done" marker; and the difficulty rating claimed to change the
+next session's volume, which no code ever did.
+
+**Pass 2, not started:** bottom tab bar, large titles, grouped inset lists,
+sheets, and the Pool view rebuild with the tick strip.
+
+### The one legibility gap still open
+
+At 375px the pool set line renders at 24.8px, under the ISO 9241 16 arcmin floor
+that `DESIGN-SPEC.md` derives for a bright hall at 70 cm. It was left alone on
+purpose: raising the size without the call/rest/qualifier split makes a 53
+character set line wrap to four lines, which is worse than small type. The split
+is specified in the spec, section 6. This is unchanged from the original app, so
+it is a gap and not a regression.
+
 ## It is live and working
 
 **https://vlad72-glitch.github.io/winandswim-trainings/**
