@@ -85,7 +85,9 @@ Replaces `index.html` lines 16 to 21 entirely. Everything that is currently a ha
   --accent-text:#075985;       /* 7.56 on white, 7.32 on light glass */
   --accent-fill:#075985;       /* white on it is 7.56, so it is the primary button */
   --accent-tint:#e0f2fe;       /* goal box, info banner, selected segment */
-  --accent-line:#9ecfea;       /* border on a tinted surface, 3:1 non text */
+  --accent-line:#9ecfea;       /* decoration on a tinted surface. NOT 3:1: on
+                                  --accent-tint it measures 1.46, so it can never
+                                  be the boundary that identifies a control. */
 
   /* semantic. All three clear 7:1 on card and on grouped. */
   --good:#155c33;              /* 8.04 / 7.21, white on it 8.04 */
