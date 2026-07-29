@@ -5,7 +5,7 @@ user-facing guide; this file is the build state.
 
 ## START HERE: the redesign is done and shipped
 
-The iOS redesign is live at cache `ws-training-v5`. `node verify.js` passes 128
+The iOS redesign is live at cache `ws-training-v6`, blockers, majors and minors all done. `node verify.js` passes 128
 checks, and `SEEDS=1-20 node verify.js` passes 4,000 simulated sessions. All six
 screens have been rendered and looked at.
 
@@ -96,13 +96,51 @@ review document:
 - History rows changed shape depending on title length, because `flex-basis:auto`
   in a wrapping row makes an item jump to its own line instead of shrinking.
 
-### Pass 2's salvaged audits, still unspent
+### The minors round, also done
+
+Every one was checked against the file first, and all eleven acted on were real:
+
+- The deck scrolled the open block into view with `index * 88`, but a collapsed row
+  is 90.1px with a 12px margin, so the real pitch is 102.1 and it landed 56px out
+  by the fifth block. It now reads `offsetTop`, which cannot drift when the type
+  changes and reads undefined behind the stub, where the guard makes it no scroll.
+- The tick strip showed a check even before it was tapped. A ring before, a check
+  after, so done and not-done differ by shape and not only by the fill inverting.
+- The tab bar declared `role="tablist"` and `role="tab"` while marking the current
+  tab with `aria-current`. Those are two different contracts: `role="tab"` promises
+  `aria-selected` and an `aria-controls` panel, neither of which exists, so
+  VoiceOver said "tab, 1 of 4" and never which one was current. A tab bar that
+  swaps the whole view is navigation, so the widget roles are gone and the nav
+  landmark and `aria-current` stayed.
+- The sheet never leaves the DOM and closing it only dropped a class, so a closed
+  sheet still advertised `aria-modal="true"` and still held the previous sheet's
+  contents. It now toggles `aria-hidden` and empties itself on close.
+- `button.good` had no dark-mode border, so Add sat at 2.42:1 against the card. The
+  primary button had already been fixed the same way and this one was missed.
+- `.seg button:active` stripped the accent fill while leaving the label white, so
+  pressing the rating already chosen went white on pale grey. Both selectors were
+  0,2,1 and only source order decided it. It dims now instead of replacing.
+- The increase-contrast border rule listed `.tile`, which is a cell inside a card,
+  so every cell got boxed separately. Now `.tiles`.
+- `hyphens:none` unprefixed is dropped at parse time on iOS 16 and earlier, so the
+  guard did not hold on the versions it was guarding. Prefixed.
+- The Ask Claude picker offered the Game role, but games come from `tr_games` and
+  `pickForRole` is never called with `"game"`, so anything added there would sit in
+  `tr_exercises` unused. Removed from the picker.
+- The hairline was drawn between a suggested set and its own Add and No buttons
+  exactly as between two different sets, so the buttons read as belonging to
+  nothing. Suppressed on that row.
+- Regenerate was offered on an unsaved draft, where the button above already says
+  "Generate another" and its own sheet talks about sets returning to the rotation,
+  which has not happened yet. Saved sessions only.
+
+### Pass 2's salvaged audits, now spent
 
 `design/pass2-*.md` are four audit documents from a workflow whose repair step died.
 They were never verified and roughly one claim in five proved false, so treat them
-as leads to confirm rather than findings to act on. Grep before fixing anything
-from them. Their remaining value is the minors list; the blockers and the majors
-worth doing are done.
+as leads to confirm rather than findings to act on. Grep before fixing anything from
+them. Everything worth acting on has been acted on; they are kept for the reasoning,
+not as a to-do list.
 
 - `design/pass2-README.md` is the index. Read the four in the order it gives.
 - `design/pass2-triage-47-findings.md` (59 items) triages every review finding
