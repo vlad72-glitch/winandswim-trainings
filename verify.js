@@ -1016,25 +1016,31 @@ function paintSweep(env){
   // line, the coaching cue, the rest split, and the Adv 1 and Adv 2 guidance the
   // mixed group swims off. Presence only, never format, so rewording the card in
   // pass 2 does not fight the harness.
+  // A set line is now split into the call he shouts and the qualifier he reads
+  // once, so the words arrive in two elements and textOf() joins them with no
+  // space between. Compare on letters and digits only: every character still
+  // has to be on screen and in order, and the harness stops caring where the
+  // element boundaries fall.
+  function flat(s){ return String(s == null ? "" : s).replace(/[^0-9a-zA-Z]+/g, ""); }
   function missingFrom(screenText, session){
-    const gaps = [];
+    const gaps = [], hay = flat(screenText);
+    const has = s => hay.indexOf(flat(s)) !== -1;
     const advOf = (b, w) => (w === 1
       ? (b.adv1 != null ? b.adv1 : (b.item && b.item.steady_variant))
       : (b.adv2 != null ? b.adv2 : (b.item && b.item.strong_variant))) || "";
     (session.blocks || []).forEach((b, i) => {
       const where = "block " + i + " ";
-      if (screenText.indexOf(b.rendered_text) === -1) gaps.push(where + "line");
+      if (!has(b.rendered_text)) gaps.push(where + "line");
       const cue = b.cue || (b.item && b.item.cue);
-      if (cue && screenText.indexOf(cue) === -1) gaps.push(where + "cue");
+      if (cue && !has(cue)) gaps.push(where + "cue");
       const rest = b.rest_adv1 || (b.item && (b.item.rest_adv1 || b.item.rest));
-      if (rest && screenText.indexOf(rest) === -1) gaps.push(where + "rest");
+      if (rest && !has(rest)) gaps.push(where + "rest");
       [1, 2].forEach(w => {
         const a = advOf(b, w);
-        if (a && screenText.indexOf(a) === -1) gaps.push(where + "Adv " + w);
+        if (a && !has(a)) gaps.push(where + "Adv " + w);
       });
     });
-    if (session.endBlock && screenText.indexOf(session.endBlock.rendered_text) === -1)
-      gaps.push("the ending");
+    if (session.endBlock && !has(session.endBlock.rendered_text)) gaps.push("the ending");
     return gaps;
   }
 
@@ -1044,10 +1050,11 @@ function paintSweep(env){
        gone.length === 0, "missing: " + gone.join(", "));
   if (gone.length) return result();
 
-  const APP = doc.getElementById("app"), WHO = doc.getElementById("who");
-  want("index.html still carries the two ids the app boots from, #app and #who",
-       !!APP && !!WHO, "#app " + (APP ? "found" : "missing") + ", #who " + (WHO ? "found" : "missing"));
-  if (!APP || !WHO) return result();
+  // The account moved out of the old header and into the Settings group on
+  // Insights, so #who is gone and #app is the only id the app boots from.
+  const APP = doc.getElementById("app");
+  want("index.html still carries the id the app boots from, #app", !!APP, "#app missing");
+  if (!APP) return result();
 
   setSeed(4242);
   setNow(BASE_NOW);
@@ -1103,22 +1110,24 @@ function paintSweep(env){
   E.setUi({ notCoach: false, coachRow: paintCoaches[0], draft: null, view: "today" });
   E.render();
   t = shot("Today with nothing generated", APP, 20, 200);
-  const tabBtns = byTag(at(byClass(APP, "tabs"), 0), "button");
+  // The tab bar is static markup outside #app now, because the icons have to be
+  // inline SVG and h() cannot build SVG.
+  const TABBAR = doc.getElementById("tabbar");
+  const tabBtns = byTag(TABBAR || NOTHING, "button");
   want("the four tabs paint, each with a label and exactly one handler",
        tabBtns.length === 4 &&
        tabBtns.every(b => label(b).length > 2 && (b.listeners.click || []).length === 1) &&
        ["Today","History","Library","Insights"].every(n => tabBtns.some(b => label(b) === n)),
        tabBtns.map(b => label(b) + "/" + (b.listeners.click || []).length).join(" "));
-  want("exactly one tab is marked as the open one", byClass(APP, "active").length === 1,
-       byClass(APP, "active").length + " marked active");
+  want("exactly one tab is marked as the open one",
+       tabBtns.filter(b => classesOf(b).indexOf("on") !== -1).length === 1,
+       tabBtns.map(b => b.className).join(" | "));
   want("the empty Today screen tells him what the button will do",
        /Press the button/.test(t) && /never repeats/.test(t), t.slice(-90));
   want("the date defaults to the next class day, not to today",
        byTag(APP, "input").some(i => i.getAttribute("type") === "date" && i.value === NEXT_CLASS),
        "wanted " + NEXT_CLASS + ", got " +
        byTag(APP, "input").map(i => i.getAttribute("type") + "=" + i.value).join(" "));
-  want("the header carries his name and a way out",
-       /Vlad/.test(textOf(WHO)) && /Log out/.test(textOf(WHO)), label(WHO));
 
   // ---- Today, with a fresh unsaved session -------------------------------
   const sk = E.buildSkeleton({ date: NEXT_CLASS, slot: "mon_1830", group: "advanced", ending: "cooldown" });
@@ -1184,9 +1193,10 @@ function paintSweep(env){
   E.setUi({ draft: saved, view: "today" });
   E.render();
   t = shot("a reopened session", APP, 60, 600);
-  const rowsMissing = storedRows.filter(r => r.rendered_text && t.indexOf(r.rendered_text) === -1);
+  const rowsMissing = storedRows.filter(r =>
+    r.rendered_text && flat(t).indexOf(flat(r.rendered_text)) === -1);
   const advMissing = storedRows.filter(r =>
-    r.steady_variant && t.indexOf(r.steady_variant) === -1);
+    r.steady_variant && flat(t).indexOf(flat(r.steady_variant)) === -1);
   want("every stored set line comes back out of the database and onto the card",
        rowsMissing.length === 0, rowsMissing.slice(0, 3).map(r => r.rendered_text).join(" | "));
   want("the stored Adv 1 and Adv 2 lines survive the round trip",
@@ -1242,14 +1252,21 @@ function paintSweep(env){
   want("the clock counts up in minutes and seconds", label(clock) === "90:00", label(clock));
   want("with nothing ticked off yet the clock does not call him behind",
        classesOf(clock).indexOf("behind") === -1, clock.className);
-  const tapped = at(pblks, 1);
-  const toggled = fire(tapped, "click");
-  want("tapping a set on the deck marks it done, by class and not by colour alone",
-       toggled === 1 && classesOf(tapped).indexOf("done") !== -1,
-       "handlers " + toggled + ", class " + tapped.className);
+  // The whole card used to change state, which made the biggest thing on screen
+  // the thing he brushed while scrolling. Now the only state change on the deck
+  // is the 104px tick strip on the one open block, and a tick redraws the deck,
+  // so the block and the clock both have to be found again afterwards.
+  const ticks = byClass(poolEl, "ptick");
+  const toggled = fire(at(ticks, 0), "click");
+  const deck2 = doc.getElementById("pool") || NOTHING;
+  const doneBlks = byClass(deck2, "pblk").filter(x => classesOf(x).indexOf("done") !== -1);
+  want("ticking the open block's strip marks it done, by class and not by colour alone",
+       toggled === 1 && ticks.length === 1 && doneBlks.length === 1,
+       "handlers " + toggled + ", " + ticks.length + " strips, " + doneBlks.length + " done");
   env.timers.runOne();
+  const clock2 = at(byClass(deck2, "clock"), 0);
   want("once there is progress to compare against, behind schedule inverts the clock",
-       classesOf(clock).indexOf("behind") !== -1, clock.className);
+       classesOf(clock2).indexOf("behind") !== -1, clock2.className);
   // The done and behind classes only exist after those two taps, so harvest again
   // or section 17 never sees them.
   harvest("pool part way through");
@@ -1265,7 +1282,7 @@ function paintSweep(env){
   E.setUi({ draft: saved, view: "today" });
   E.render();
   function tab(name){
-    const b = byTag(APP, "button").filter(x => label(x) === name)[0];
+    const b = tabBtns.filter(x => label(x) === name)[0];
     if (!b) return false;
     fire(b, "click");
     return true;
@@ -1315,6 +1332,15 @@ function paintSweep(env){
        /Steady pace/.test(t) &&
        byTag(APP, "input").some(i => i.value === String(S.pace_steady_s_per_100)),
        byTag(APP, "input").map(i => i.value).join(" "));
+  want("the settings group carries his name and a way out",
+       /Vlad/.test(t) && byTag(APP, "button").map(label).indexOf("Log out") !== -1,
+       t.slice(0, 90));
+  // The two seam hooks were exported for this and nothing used them, so a card
+  // could throw here and no check would say so.
+  let smoke = "";
+  try{ E.clearApp(); E.renderCard(saved, false); }catch(e){ smoke = e.message; }
+  want("the session card draws through the seam hook without throwing",
+       smoke === "" && byClass(APP, "blk").length > 0, smoke || "no blocks drawn");
 
   // ---- the offline banners -----------------------------------------------
   tab("Today");
