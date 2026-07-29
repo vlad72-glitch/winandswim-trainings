@@ -14,29 +14,52 @@
 <link rel="manifest" href="manifest.webmanifest">
 <title>W&S Training Generator</title>
 <style>
-  /* ==========================================================================
-     Tokens, in three groups on purpose.
-
-     1. Structure, identical in every mode.
-     2. Themed surfaces, which follow the phone's light or dark setting.
-     3. Pool literals, further down, which follow nothing at all.
-
-     Pool view is the only screen read at arm's length in a bright hall with wet
-     hands, so it never themes and never goes dark. Everything else does.
-     ========================================================================== */
+  /* One file, two registers. Structure tokens are mode independent, themed
+     surfaces follow the phone, and the pool literals follow nothing at all:
+     pool view is the only screen read at arm's length in a bright hall with wet
+     hands, so it never themes and never takes glass. Every ratio in a comment
+     below was computed from WCAG relative luminance with alpha composited.
+     Body text clears 7:1 on every surface it can land on. */
   :root{
     color-scheme: light dark;
 
-    --r-card:14px; --r-inner:10px; --r-ctl:11px; --r-pill:999px;
+    /* radii. Concentric: inner = outer minus the gap, floored at 0. */
+    --r-sheet:20px; --r-card:14px; --r-inner:10px; --r-ctl:11px; --r-pill:999px;
+    --r-pool:16px;
+
+    /* spacing, 8px base with 4px half steps */
     --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px; --s-6:24px;
+    --gutter:16px;        /* one alignment column for title, lists and cards */
+    --group-gap:28px;     /* between two grouped inset lists */
 
-    /* 44px is the floor for anything you tap, not the target. A wet fingertip
-       spreads wider than a dry one and lands less precisely. */
+    /* 44px is the floor for anything you tap, not the target. */
     --ctl-h:44px;
-    --ctl-h-lg:56px;
+    --ctl-h-lg:56px;      /* the one primary action on a screen */
+    --tabbar-h:49px;
+    --topbar-h:44px;
 
-    --dur-fast:120ms;
+    /* Type. The iOS ladder in exact pixels at the 16px default root, so the
+       app reads native today. If Vlad approves Dynamic Type later, the
+       single line `:root{font:-apple-system-body}` makes 1rem 17px and the
+       whole ladder grows 6% together. */
+    --fs-title-lg:2.125rem;  /* 34 */
+    --fs-title-1:1.75rem;    /* 28 */
+    --fs-title-2:1.375rem;   /* 22 */
+    --fs-title-3:1.25rem;    /* 20 */
+    --fs-body:1.0625rem;     /* 17 */
+    --fs-callout:1rem;       /* 16 */
+    --fs-sub:.9375rem;       /* 15 */
+    --fs-foot:.8125rem;      /* 13 */
+    --fs-cap:.75rem;         /* 12 */
+    --fs-cap-2:.6875rem;     /* 11 */
+
+    /* one z table, no ad hoc numbers */
+    --z-topbar:30; --z-tabbar:40; --z-scrim:60; --z-sheet:61;
+    --z-toast:100; --z-pool:200; --z-pool-toast:210;
+
+    --dur-fast:120ms; --dur-mid:250ms; --dur-sheet:340ms;
     --ease-out:cubic-bezier(.2,.8,.3,1);
+    --ease-sheet:cubic-bezier(.32,.72,0,1);
   }
 
   /* ---------- themed surfaces: light ---------- */
@@ -44,57 +67,74 @@
     --bg-grouped:#f2f2f7;
     --bg-card:#ffffff;
     --bg-nested:#f2f2f7;
+    --bg-sheet:#f2f2f7;
 
-    /* Three label levels. Each one measured against white AND against the
-       grouped grey, because both sit behind text somewhere. */
-    --label:#13212b;      /* 16.4 on card, 14.7 on grouped */
-    --label-2:#414e58;    /* 8.55 / 7.66 */
-    --label-3:#636f7b;    /* 5.13 / 4.60, placeholders and decoration only */
+    /* Three label levels, each measured against white AND against the
+       grouped grey, because both sit behind text somewhere. --label-3 is for
+       placeholders, chevrons and disabled glyphs, where 4.6 is fine because
+       nothing is read from it. */
+    --label:#13212b;      /* 16.40 on card, 14.70 on grouped */
+    --label-2:#414e58;    /* 8.55 on card, 7.66 on grouped */
+    --label-3:#636f7b;    /* 5.13 / 4.60, never body text */
+    --on-fill:#3a4650;    /* 8.41 on a fill over card, 7.57 over grouped */
 
-    --sep:rgba(60,60,67,.29);
+    --sep:rgba(60,60,67,.29);   /* flattens to #c6c6c8 */
     --sep-opaque:#c6c6c8;
+    --fill-1:rgba(120,120,128,.20);
+    --fill-2:rgba(120,120,128,.16);
     --fill-3:rgba(118,118,128,.12);
     --fill-4:rgba(116,116,128,.08);
 
-    /* The accent is split by job. White on #0284c7 is 4.10, which fails AA, so
-       every primary button in the old design was below the standard. #0284c7
-       stays for glyphs and thin lines. Fills and coloured text use the darker
-       one, where white reaches 7.56. */
+    /* The accent is split by job. White on #0284c7 is 4.10, which fails AA,
+       so every primary button in the old design was below the standard.
+       Fills and coloured text use the darker one, where white reaches 7.56. */
     --accent:#0284c7;
-    --accent-text:#075985;
-    --accent-fill:#075985;
+    --accent-text:#075985;      /* 7.56 on card, 7.32 on flattened glass */
+    --accent-fill:#075985;      /* white on it 7.56 */
     --accent-tint:#e0f2fe;
-    --accent-line:#9ecfea;
+    --accent-line:#9ecfea;      /* decoration on a tint, not a boundary */
 
     --good:#155c33; --good-fill:#155c33; --good-tint:#dcfce7; --good-line:#8fd0a6;
     --warn:#743e00; --warn-tint:#fff7ed; --warn-line:#e3b478;
     --bad:#9f1a1a;  --bad-tint:#fef2f2;  --bad-line:#e8a3a3;
 
-    /* Split by job, the same way the accent is. --good is for TEXT on a tint,
-       so in dark mode it goes pale. --good-fill is for a filled button, so it
-       stays dark in both modes. Using the pale one as a fill is readable but
-       wrong: it makes Save the brightest thing on the card and shouts louder
-       than the action you actually want. */
+    /* Split by job, like the accent. --good is text on a tint, so it goes pale
+       in dark. --good-fill is a filled button, so it stays dark in both and
+       keeps white ink: a pale fill makes Save the loudest thing on the card. */
     --on-accent:#ffffff; --on-good:#ffffff;
 
+    /* glass, the functional layer. Two elements on screen, no more. */
+    --glass-fill:rgba(255,255,255,.72);
+    --glass-rim:rgba(255,255,255,.70);   /* inset top, the specular highlight */
+    --glass-edge:rgba(0,0,0,.10);        /* 1px outer, the darkened edge */
+    --glass-drop:0 6px 20px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06);
+    --glass-blur:20px;
+    --glass-flat:#fbfbfd;                /* the same fill flattened */
+
+    --scrim:rgba(0,0,0,.40);
     --shadow-card:0 1px 2px rgba(16,42,58,.05);
+    --shadow-sheet:0 -12px 40px rgba(0,0,0,.28);
   }
 
   /* ---------- themed surfaces: dark ---------- */
   @media (prefers-color-scheme: dark){
     :root{
       /* The inversion that catches people out: grouped is lighter than card in
-         light mode, and darker than card in dark mode. */
+         light mode and darker than card in dark mode. */
       --bg-grouped:#000000;
       --bg-card:#1c1c1e;
       --bg-nested:#2c2c2e;
+      --bg-sheet:#1c1c1e;
 
-      --label:#ffffff;      /* 17.0 on card, 21.0 on grouped */
-      --label-2:#b0b9c1;    /* 8.55 card, 7.01 nested */
+      --label:#ffffff;      /* 17.01 on card, 21.00 on grouped */
+      --label-2:#b0b9c1;    /* 8.55 on card, 7.01 on nested */
       --label-3:#949ea8;    /* 6.25 / 5.12 */
+      --on-fill:#c3cbd2;    /* 7.78 on a fill over card, 10.36 over grouped */
 
       --sep:rgba(84,84,88,.65);
       --sep-opaque:#404044;
+      --fill-1:rgba(120,120,128,.36);
+      --fill-2:rgba(120,120,128,.32);
       --fill-3:rgba(118,118,128,.24);
       --fill-4:rgba(118,118,128,.18);
 
@@ -105,227 +145,689 @@
       --warn:#f5c377; --warn-tint:#42382b; --warn-line:#7d6640;
       --bad:#ffada8;  --bad-tint:#453434;  --bad-line:#8a5b58;
 
-      /* Both fills stay dark here, so both keep white ink. */
+      /* Both fills stay dark here, so both keep white ink: 7.26 and 7.02. */
       --on-accent:#ffffff; --on-good:#ffffff;
 
-      --shadow-card:none;   /* dark mode separates by fill, not by shadow */
+      --glass-fill:rgba(28,28,30,.72);
+      --glass-rim:rgba(255,255,255,.16);
+      --glass-edge:rgba(0,0,0,.60);
+      --glass-drop:0 6px 20px rgba(0,0,0,.50), 0 1px 2px rgba(0,0,0,.35);
+      --glass-flat:#141416;
+
+      --scrim:rgba(0,0,0,.60);
+      --shadow-card:none;   /* dark mode separates by fill and border, not shadow */
+      --shadow-sheet:0 -12px 40px rgba(0,0,0,.60);
     }
+  }
+
+  /* Pool literals, hoisted to :root and NOT into the dark block, because the
+     pool toast mounts outside #pool and could never inherit from it. Dark mode
+     does not reach in here: a large light field constricts the pupil, which
+     lifts what he can resolve, and a droplet on a dark screen scatters as a
+     bright point. There is a manual Night pool switch instead. */
+  :root{
+    --p-ink:#000; --p-paper:#fff;
+    --p-done-fill:#e8ecef;      /* black on it is 17.68, so it decorates only */
+    --p-behind-ink:#fff; --p-behind-fill:#000;   /* late inverts, it does not go red */
+    --p-border:3px;
   }
 
   /* Reduce Transparency and Increase Contrast are two different requests, so
-     they get two different blocks. Bundling them is how light-mode label
-     colours end up painted on a dark background. */
+     they get separate blocks, and the dark override is separate again. Bundle
+     them and light-mode label hexes land on a dark card: #000000 on #1c1c1e
+     measures 1.24. Never put a label hex in the shared block. */
   @media (prefers-contrast: more), (prefers-reduced-transparency: reduce){
-    :root{ --sep:var(--sep-opaque); --shadow-card:none; }
+    :root{
+      --sep:var(--sep-opaque); --shadow-card:none;
+      --glass-fill:var(--glass-flat); --glass-blur:0px;
+      --glass-edge:var(--sep-opaque); --glass-drop:none; --glass-rim:transparent;
+      --scrim:rgba(0,0,0,.70);
+    }
+    /* A dark card differs from the page by 1.24, so once the shadow is gone
+       the border is the only thing left holding the edge. */
+    .card,.list-card,.blk,.tile,.goalbox,.sheet{ border:1px solid var(--label-3); }
   }
   @media (prefers-contrast: more){
-    :root{ --label:#000000; --label-2:#2b343c; --label-3:#4a545e; }
+    :root{ --label:#000000; --label-2:#2b343c; --label-3:#4a545e; --on-fill:#2b343c; }
   }
   @media (prefers-color-scheme: dark) and (prefers-contrast: more){
-    :root{ --label:#ffffff; --label-2:#dfe4e8; --label-3:#b9c1c8; }
+    :root{ --label:#ffffff; --label-2:#dfe4e8; --label-3:#b9c1c8; --on-fill:#dfe4e8; }
   }
+  /* Same request, reachable without the OS setting: a switch in Settings. */
+  body.solid .glass{
+    background:var(--glass-flat);
+    -webkit-backdrop-filter:none; backdrop-filter:none;
+    box-shadow:none; border-bottom-color:var(--sep-opaque);
+  }
+  body.solid .card,body.solid .list-card,body.solid .tile{ box-shadow:none; }
+
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{
       transition-duration:.01ms !important; animation-duration:.01ms !important;
+      animation-iteration-count:1 !important; scroll-behavior:auto !important;
     }
   }
 
-  /* ==========================================================================
-     Base
-     ========================================================================== */
+  /* Base */
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  /* Rubber-banding the page behind a fixed overlay shows the page
+     underneath, which on the deck is a flash of the wrong register. */
+  html{overscroll-behavior-y:none;-webkit-text-size-adjust:100%;}
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    background:var(--bg-grouped); color:var(--label); line-height:1.45;
-    -webkit-text-size-adjust:100%;
-    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  }
-  .wrap{max-width:860px;margin:0 auto;padding:14px 14px 60px;}
-  header{display:flex;align-items:center;gap:10px;padding:10px 4px;flex-wrap:wrap;}
-  header h1{font-size:1.15rem;margin:0;font-weight:700;display:flex;align-items:center;gap:7px;}
-  header .spacer{flex:1;}
-
-  /* ==========================================================================
-     Controls
-
-     Everything tappable clears 44px. The old buttons were 39px, and the rep
-     steppers were 27px tall by 55px wide, which is a coin flip with a wet hand.
-     Feedback is on :active, not :hover: a phone has no hover, and iOS leaves a
-     hover state stuck on the last thing you touched.
-     ========================================================================== */
-  nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 2px 14px;}
-  nav.tabs button{border-radius:var(--r-pill);padding:0 16px;font-size:.92rem;}
-  nav.tabs button.active{
-    background:var(--accent-fill);border-color:var(--accent-fill);color:var(--on-accent);
-  }
-  button{
-    font:inherit;cursor:pointer;
-    display:inline-flex;align-items:center;justify-content:center;gap:6px;
-    min-height:var(--ctl-h); padding:0 14px;
-    border:1px solid var(--sep); background:var(--bg-card); color:var(--label);
-    border-radius:var(--r-ctl);
+    font-size:var(--fs-body); line-height:1.294;
+    background:var(--bg-grouped); color:var(--label);
     -webkit-tap-highlight-color:transparent;
+  }
+  /* Safe area lives on each fixed element, not on body: padding on body does
+     nothing for a position:fixed child and doubles up with the bar. All four
+     insets, so landscape on a notched phone still clears the sensor housing. */
+  body>.wrap{
+    max-width:860px; margin:0 auto;
+    padding-left:max(var(--gutter),env(safe-area-inset-left));
+    padding-right:max(var(--gutter),env(safe-area-inset-right));
+    padding-top:calc(env(safe-area-inset-top) + var(--topbar-h) + var(--s-2));
+    padding-bottom:calc(var(--tabbar-h) + max(env(safe-area-inset-bottom),8px) + var(--s-6));
+  }
+  .largetitle{
+    font-size:var(--fs-title-lg); line-height:1.206; font-weight:700;
+    margin:var(--s-2) 0 var(--s-4); letter-spacing:.004em;
+  }
+  .gone{ display:none !important; }
+  [hidden]{ display:none !important; }   /* flex beats the UA rule, so restate it */
+
+  /* The shell: one glass top bar, one glass tab bar, and that is the whole
+     glass budget. backdrop-filter on a fixed element repaints the blurred
+     region every scroll frame, so a third one buys jank and nothing visual. */
+  .glass{
+    background:var(--glass-fill);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%);
+    backdrop-filter:blur(var(--glass-blur)) saturate(180%);
+    border:0; border-bottom:1px solid var(--glass-edge);
+    box-shadow:inset 0 1px 0 0 var(--glass-rim), var(--glass-drop);
+  }
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    .glass{ background:var(--glass-flat); }
+  }
+  .topbar{
+    position:fixed; left:0; right:0; top:0; z-index:var(--z-topbar);
+    display:flex; align-items:center; gap:var(--s-2);
+    min-height:calc(env(safe-area-inset-top) + var(--topbar-h));
+    padding:env(safe-area-inset-top)
+            max(var(--s-2),env(safe-area-inset-right)) 0
+            max(var(--s-2),env(safe-area-inset-left));
+    transition:background var(--dur-mid) var(--ease-out);
+  }
+  /* Until the large title has scrolled away the bar has nothing to separate,
+     so it carries no material at all. Body-scoped so it ties with
+     body.solid .glass on specificity and wins on order. */
+  body .topbar:not(.compact){
+    background:transparent; -webkit-backdrop-filter:none; backdrop-filter:none;
+    border-bottom-color:transparent; box-shadow:none;
+  }
+  .topbar-title{
+    flex:1; text-align:center; min-width:0;
+    font-size:var(--fs-body); font-weight:600;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    opacity:0; transition:opacity var(--dur-mid) var(--ease-out);
+  }
+  .topbar.compact .topbar-title{ opacity:1; }
+  .barbtn{
+    min-height:var(--ctl-h); min-width:var(--ctl-h); padding:0 var(--s-3);
+    border:0; background:transparent; color:var(--accent-text);
+    font-size:var(--fs-body); font-weight:600; border-radius:var(--r-ctl);
+    flex:none;
+  }
+  .barbtn:active{ background:var(--fill-3); }
+
+  .tabbar{
+    position:fixed; left:0; right:0; bottom:0; z-index:var(--z-tabbar);
+    display:flex; align-items:stretch;
+    padding-bottom:max(env(safe-area-inset-bottom),8px);
+    padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right);
+    border-bottom:0; border-top:1px solid var(--glass-edge);
+    -webkit-user-select:none; user-select:none;
+    transition:transform var(--dur-mid) var(--ease-out);
+  }
+  /* A fixed bottom bar sits behind the iOS keyboard, so it steps out of the
+     way while a field has focus. Driven by a class on body from focusin and
+     focusout, never from visualViewport. */
+  body.kbd .tabbar{ transform:translateY(110%); }
+  .tab{
+    flex:1; min-height:var(--tabbar-h); min-width:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:2px; padding:6px 2px 2px;
+    border:0; background:none; color:var(--label-2);
+    -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+  }
+  .tab:active{ opacity:.55; }
+  .tab svg{ width:28px; height:28px; flex:none; }
+  .tab .lbl{
+    font-size:var(--fs-cap-2); line-height:1.2; font-weight:500;
+    text-transform:none; letter-spacing:0; color:inherit;
+  }
+  /* The glyph may carry the accent, which is a 3:1 non text colour. #0284c7
+     on flattened light glass is 3.96, so the label takes --accent-text at
+     7.32 instead. */
+  .tab.on{ color:var(--accent); }
+  .tab.on .lbl{ color:var(--accent-text); }
+
+  /* ---------- sheets ---------- */
+  .scrim{
+    position:fixed; inset:0; z-index:var(--z-scrim); background:var(--scrim);
+    opacity:0; pointer-events:none; transition:opacity var(--dur-mid) ease;
+  }
+  .scrim.on{ opacity:1; pointer-events:auto; }
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:var(--z-sheet);
+    display:flex; flex-direction:column; overflow:hidden;
+    max-height:92dvh;
+    border-radius:var(--r-sheet) var(--r-sheet) 0 0;
+    background:var(--bg-sheet); color:var(--label);
+    box-shadow:var(--shadow-sheet);
+    transform:translateY(101%);
+    transition:transform var(--dur-sheet) var(--ease-sheet);
+    padding-bottom:max(env(safe-area-inset-bottom),12px);
+    padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right);
+  }
+  .sheet.on{ transform:translateY(0); }
+  .sheet.med{ max-height:62dvh; }
+  /* A sheet that holds a field stays short, so the iOS keyboard cannot cover
+     the field it was opened for. */
+  .sheet.sm{ max-height:44dvh; }
+  .grabber{
+    width:36px; height:5px; border-radius:2.5px; margin:6px auto 0;
+    background:var(--label-3); flex:none;
+  }
+  .sheet-head{
+    flex:none; padding:var(--s-3) var(--gutter) var(--s-2);
+    font-size:var(--fs-title-2); font-weight:700;
+  }
+  /* flex plus min-height:0 is what makes the body the part that scrolls
+     instead of the sheet growing past its own max-height. */
+  .sheet-body{
+    flex:1 1 auto; min-height:0;
+    overflow-y:auto; overscroll-behavior:contain;
+    padding:0 var(--gutter) var(--s-4);
+  }
+
+  /* Controls. Everything tappable clears 44px, and feedback is on :active:
+     a phone has no hover, and iOS leaves hover stuck on the last thing you
+     touched. */
+  button{
+    font:inherit; font-weight:600; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    min-height:var(--ctl-h); padding:.6em 1.1em;
+    border:1px solid var(--sep-opaque); border-radius:var(--r-ctl);
+    background:var(--bg-card); color:var(--label);
+    -webkit-appearance:none; appearance:none;
+    -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+    -webkit-user-select:none; user-select:none;
     transition:background var(--dur-fast) var(--ease-out),
                transform var(--dur-fast) var(--ease-out);
   }
-  button:active{background:var(--fill-3);transform:scale(.97);}
-  @media (hover:hover){ button:hover{background:var(--fill-4);} }
+  button:active{background:var(--fill-2);transform:scale(.97);}
+  button:disabled{opacity:.4;cursor:default;transform:none;}
+  button:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
   button.primary{background:var(--accent-fill);border-color:var(--accent-fill);color:var(--on-accent);}
+  /* --accent-fill is dark in both modes, so brightening is the visible
+     direction. #0c5c86 on #1c1c1e is 2.34, and --accent-line is already
+     #3b6d87, which clears 3:1 on card and on page. */
   button.primary:active{background:var(--accent-text);filter:brightness(1.15);}
   button.good{background:var(--good-fill);border-color:var(--good-fill);color:var(--on-good);}
+  button.plain{background:transparent;border-color:transparent;color:var(--accent-text);}
+  button.plain:active{background:var(--fill-3);}
   button.ghost{background:transparent;border-color:transparent;color:var(--label-2);}
   button.ghost:active{background:var(--fill-3);color:var(--label);}
   button.danger{color:var(--bad);border-color:transparent;background:transparent;}
   button.danger:active{background:var(--bad-tint);}
-  button:disabled{opacity:.4;cursor:default;transform:none;}
-  /* Still a 44px target, just a smaller label on it. */
-  button.small{font-size:.85rem;padding:0 12px;min-width:64px;border-radius:var(--r-inner);}
-  button.big{min-height:var(--ctl-h-lg);padding:0 22px;font-size:1.1rem;font-weight:600;border-radius:var(--r-card);}
+  /* Still a 44px target, just a smaller label on it. The five rating buttons
+     are one character each, so the minimum width is load bearing. */
+  button.small{font-size:var(--fs-sub);padding:0 12px;min-width:64px;border-radius:var(--r-inner);}
+  button.big{min-height:var(--ctl-h-lg);width:100%;padding:0 22px;
+        font-size:var(--fs-body);font-weight:600;border-radius:var(--r-card);}
+  @media (prefers-color-scheme: dark){
+    button.primary{border-color:var(--accent-line);}
+  }
+  /* Only where a real pointer exists, because on iOS a bare :hover sticks to
+     the last thing you touched and reads as a control that never let go. */
+  @media (hover:hover) and (pointer:fine){
+    button:hover{background:var(--fill-3);}
+    button.primary:hover{filter:brightness(1.08);}
+    .irow.tap:hover{background:var(--fill-4);}
+  }
 
   input,select,textarea{
     font:inherit;color:var(--label);background:var(--bg-card);
-    border:1px solid var(--sep);border-radius:var(--r-ctl);
-    min-height:var(--ctl-h);padding:0 12px;
+    /* rgba(60,60,67,.29) over white flattens to #c6c6c8, which is 1.71
+       against the field's own fill, so there is no perceivable boundary at
+       all. Where the border is the only thing identifying the control it has
+       to clear 3:1, so the default is --label-3 at 5.13 light, 6.25 dark. */
+    border:1px solid var(--label-3);border-radius:var(--r-ctl);
+    min-height:var(--ctl-h);padding:10px 12px;
+    -webkit-appearance:none; appearance:none;
   }
-  textarea{width:100%;min-height:88px;padding:10px 12px;resize:vertical;line-height:1.45;}
-  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent);}
-  select.small,input.small{font-size:.85rem;padding:0 10px;}
+  /* Inside a grouped row the row identifies the control, so the field steps
+     back to a hairline. */
+  .irow input,.irow select{border-color:var(--sep-opaque);}
+  textarea{width:100%;min-height:88px;resize:vertical;line-height:1.35;}
+  input:focus,select:focus,textarea:focus{outline:3px solid var(--accent);outline-offset:1px;border-color:var(--accent);}
+  /* appearance:none takes the caret off a select, and the caret is the only
+     thing that says the row opens a picker, so draw it back with two
+     gradients. No asset, no font. */
+  select{
+    padding-right:30px;
+    background-image:linear-gradient(45deg,transparent 50%,var(--label-3) 50%),
+                     linear-gradient(135deg,var(--label-3) 50%,transparent 50%);
+    background-position:calc(100% - 16px) calc(50% - 2px),calc(100% - 11px) calc(50% - 2px);
+    background-size:6px 6px,6px 6px;
+    background-repeat:no-repeat;
+  }
+  select.small,input.small{font-size:var(--fs-sub);padding:0 10px;}
+  select.small{padding-right:30px;}
   input::placeholder,textarea::placeholder{color:var(--label-3);}
 
-  /* ==========================================================================
-     Surfaces
-     ========================================================================== */
+  /* segmented control, for the 1 to 5 rating */
+  .seg{display:flex;background:var(--fill-3);border-radius:var(--r-ctl);padding:2px;gap:2px;}
+  .seg button{flex:1;min-width:44px;min-height:var(--ctl-h);padding:0;border:0;
+        border-radius:calc(var(--r-ctl) - 2px);background:transparent;color:var(--label);}
+  /* A white pill on a light track is a 1.15 state indicator, which is not a
+     state indicator. The chosen cell takes the accent fill at 7.56. */
+  .seg button.primary{background:var(--accent-fill);color:var(--on-accent);box-shadow:none;}
+  .seg button:active{background:var(--fill-1);transform:none;}
+
+  /* iOS switch. White knob on --good-fill is 7.02, so the state reads without
+     colour vision: the knob moves as well as the track filling. */
+  .sw{
+    flex:none;width:51px;min-width:51px;height:31px;min-height:31px;padding:0;
+    border:1px solid var(--sep-opaque);border-radius:var(--r-pill);
+    background:var(--fill-1);position:relative;
+  }
+  .sw i{
+    display:block;width:27px;height:27px;border-radius:var(--r-pill);
+    background:#ffffff;box-shadow:0 1px 3px rgba(0,0,0,.25);
+    position:absolute;top:1px;left:1px;
+    transition:transform var(--dur-fast) var(--ease-out);
+  }
+  .sw.on{background:var(--good-fill);border-color:var(--good-fill);}
+  .sw.on i{transform:translateX(20px);}
+  .sw:active{transform:none;}
+
+  /* Surfaces */
   .card{
     background:var(--bg-card);border:1px solid var(--sep);border-radius:var(--r-card);
-    padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow-card);
+    padding:var(--s-4);margin-bottom:var(--s-4);box-shadow:var(--shadow-card);
   }
-  .card h2{margin:0 0 2px;font-size:1.15rem;}
+  .card h2{margin:0 0 2px;font-size:var(--fs-title-2);line-height:1.273;}
   .row{display:flex;align-items:center;gap:10px;}
   .row.wrap{flex-wrap:wrap;}
-  .muted{color:var(--label-2);} .small{font-size:.85rem;} .tiny{font-size:.78rem;}
+  .muted{color:var(--label-2);}
+  .small{font-size:var(--fs-sub);}
+  .tiny{font-size:var(--fs-foot);}
   .stack>*+*{margin-top:10px;}
-  .section-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--label-2);margin:0 0 8px;}
-  .center{text-align:center;}
+  .section-label{font-size:var(--fs-cap);font-weight:700;text-transform:uppercase;
+        letter-spacing:.05em;color:var(--label-2);margin:0 0 8px;}
   .empty{text-align:center;color:var(--label-2);padding:26px 10px;}
   /* Was an inline #f5f8fa, which is near white behind white text in dark mode. */
   .codeblock{
     background:var(--bg-nested);border:1px solid var(--sep);
     padding:10px;border-radius:var(--r-inner);overflow-x:auto;
   }
+  pre{margin:0;font-size:var(--fs-foot);}
 
-  /* The login fields used to size themselves to their placeholder text, so on a
-     phone they sat at about 60% of the width with the button stranded beside
-     them. One screen, so the rule is scoped to it. */
+  /* The login fields used to size themselves to their placeholder text, so
+     on a phone they sat at about 60% of the width with the button stranded
+     beside them. One screen, so the rule is scoped to it. */
   .login input{width:100%;}
   .login .row{display:block;}
   .login .row button{width:100%;min-height:var(--ctl-h-lg);}
 
-  .err{background:var(--bad-tint);color:var(--bad);border:1px solid var(--bad-line);border-radius:var(--r-inner);padding:8px 10px;font-size:.9rem;margin-top:8px;}
-  .banner{background:var(--warn-tint);color:var(--warn);border:1px solid var(--warn-line);border-radius:var(--r-inner);padding:8px 10px;font-size:.88rem;margin-bottom:12px;}
-  .banner.ok{background:var(--good-tint);color:var(--good);border-color:var(--good-line);}
-  .banner.info{background:var(--accent-tint);color:var(--accent-text);border-color:var(--accent-line);}
+  /* Grouped inset list. The row + row::before hairline is a true half pixel
+     on retina and needs no last-child exception, which matters because there
+     is no querySelectorAll to fix up separators from script. */
+  .list{margin:0 0 var(--group-gap);}
+  .list-hdr{font-size:var(--fs-foot);line-height:1.385;font-weight:600;
+        text-transform:uppercase;letter-spacing:.06em;color:var(--label-2);
+        padding:0 var(--s-4) 7px;margin:0;}
+  .list-ftr{font-size:var(--fs-foot);line-height:1.385;color:var(--label-2);
+        padding:7px var(--s-4) 0;margin:0;}
+  .list-card{background:var(--bg-card);border:1px solid var(--sep);
+        border-radius:var(--r-card);box-shadow:var(--shadow-card);overflow:hidden;}
+  .irow{
+    position:relative;display:flex;align-items:center;justify-content:flex-start;
+    gap:var(--s-3);
+    width:100%;min-height:var(--ctl-h);padding:9px var(--s-4);
+    background:transparent;border:0;border-radius:0;
+    color:var(--label);text-align:left;font-weight:400;flex-wrap:wrap;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .irow+.irow::before{
+    content:"";position:absolute;left:var(--s-4);right:0;top:0;height:1px;
+    background:var(--sep);transform:scaleY(.5);transform-origin:top;
+  }
+  .irow:active{transform:none;}
+  .irow.tap{cursor:pointer;touch-action:manipulation;}
+  .irow.tap:active{background:var(--fill-3);}
+  .irow .r-main{flex:1 1 auto;min-width:0;}
+  .irow .r-1{font-size:var(--fs-body);font-weight:600;}
+  .irow .r-2{font-size:var(--fs-sub);color:var(--label-2);}
+  .irow .r-3{font-size:var(--fs-foot);color:var(--label-2);}
+  .irow .r-val{margin-left:auto;color:var(--label-2);font-size:var(--fs-body);
+        font-variant-numeric:tabular-nums;flex:none;}
+  /* Row tones are named r-* on purpose. A .good on a row would be outranked
+     by button.good, which is a type plus a class, and in light mode that
+     paints #155c33 text on a #155c33 fill at 1.00. */
+  .irow.r-good .r-1{color:var(--good);}
+  .irow.r-danger .r-1{color:var(--bad);}
+  .irow.r-accent .r-1{color:var(--accent-text);}
+  .chev{flex:none;width:9px;height:15px;color:var(--label-3);}
+  .irow.act{justify-content:center;font-weight:600;}
+  .irow.act .r-1{text-align:center;}
+  /* A native date input or select inside a row is the iOS picker sheet for
+     free, so the row carries the real control instead of a fake value line. */
+  .irow>input,.irow>select{margin-left:auto;flex:0 1 auto;min-width:0;max-width:64%;}
+  /* Keep and reject at opposite ends of a full width row. They used to sit
+     4px apart, which is inside one sigma of a wet finger. */
+  .irow.pact{justify-content:space-between;gap:var(--s-6);}
 
-  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;}
-  .tile{background:var(--bg-card);border:1px solid var(--sep);border-radius:var(--r-card);padding:12px 14px;}
-  .tile .lbl{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--label-2);}
-  .tile .val{font-size:1.35rem;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums;}
-  .tile .sub{font-size:.78rem;color:var(--label-2);margin-top:2px;}
+  .err{background:var(--bad-tint);color:var(--label);border:1px solid var(--bad-line);
+        border-radius:var(--r-inner);padding:8px 10px;font-size:var(--fs-sub);margin-top:8px;}
+  /* Banners: the tint and the border carry the meaning and the words stay at
+     --label. Semantic ink on its own tint runs 6.2 to 8.1 depending on the
+     pair, and the message is body text, so it gets 14.3 or better instead. */
+  .banner{background:var(--warn-tint);color:var(--label);border:1px solid var(--warn-line);
+        border-radius:var(--r-inner);padding:10px var(--s-3);font-size:var(--fs-callout);
+        margin-bottom:var(--s-3);}
+  .banner.ok{background:var(--good-tint);border-color:var(--good-line);}
+  .banner.info{background:var(--accent-tint);border-color:var(--accent-line);}
+  /* Offline runs edge to edge under the large title, so the negative margin
+     has to cancel exactly the padding the wrap used, insets included. */
+  .banner.edge{
+    border-radius:0;border-left:0;border-right:0;
+    margin-top:0;margin-bottom:var(--s-3);
+    margin-left:calc(max(var(--gutter),env(safe-area-inset-left)) * -1);
+    margin-right:calc(max(var(--gutter),env(safe-area-inset-right)) * -1);
+    padding-left:max(var(--gutter),env(safe-area-inset-left));
+    padding-right:max(var(--gutter),env(safe-area-inset-right));
+  }
 
-  .badge{font-size:.7rem;font-weight:600;background:var(--fill-3);color:var(--label-2);padding:2px 8px;border-radius:var(--r-pill);white-space:nowrap;}
+  .toast{
+    position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(var(--tabbar-h) + max(env(safe-area-inset-bottom),8px) + 12px);
+    z-index:var(--z-toast);max-width:90%;pointer-events:none;
+    background:var(--label);color:var(--bg-card);
+    border-radius:var(--r-pill);padding:12px 18px;
+    font-size:var(--fs-callout);font-weight:600;   /* 16.40 light, 17.01 dark */
+    box-shadow:var(--glass-drop);
+  }
+  /* #pool is at z-index 200, so a glass-register toast was painted behind
+     the deck and he never saw it. This one is above it and in its register. */
+  .toast.pool{
+    z-index:var(--z-pool-toast);
+    bottom:calc(env(safe-area-inset-bottom) + 96px);
+    background:var(--p-paper);color:var(--p-ink);
+    border:var(--p-border) solid var(--p-ink);border-radius:var(--r-pool);
+    font-size:var(--p-btn);box-shadow:none;
+  }
+
+  /* Stat strip. Was a 2x2 grid 202px tall, which pushed Start pool view off
+     the first screen. One row of four recovers about 120px. */
+  .tiles{display:flex;align-items:stretch;background:var(--bg-card);
+        border:1px solid var(--sep);border-radius:var(--r-card);
+        box-shadow:var(--shadow-card);overflow:hidden;margin-bottom:var(--s-4);}
+  .tile{flex:1 1 0;min-width:0;padding:8px var(--s-2);text-align:center;
+        border-left:1px solid var(--sep);}
+  .tile:first-child{border-left:0;}
+  .tile .lbl{font-size:var(--fs-cap-2);font-weight:700;text-transform:uppercase;
+        letter-spacing:.04em;color:var(--label-2);}
+  .tile .val{font-size:var(--fs-title-3);font-weight:700;margin-top:1px;
+        font-variant-numeric:tabular-nums;overflow-wrap:break-word;}
+  .tile .sub{font-size:var(--fs-cap-2);color:var(--label-2);margin-top:1px;
+        overflow-wrap:break-word;}
+
+  .badge{font-size:var(--fs-cap);font-weight:600;line-height:1.4;
+        background:var(--fill-3);color:var(--on-fill);
+        padding:3px 9px;border-radius:var(--r-pill);white-space:nowrap;}
   .badge.warn{background:var(--warn-tint);color:var(--warn);}
   .badge.ok{background:var(--good-tint);color:var(--good);}
   .badge.accent{background:var(--accent-tint);color:var(--accent-text);}
 
   /* ---------- session blocks ---------- */
-  .blk{border:1px solid var(--sep);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--bg-card);}
-  .blk .role{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--label-2);}
-  .blk .line{font-size:1.08rem;font-weight:650;margin-top:3px;}
-  .blk .cue{color:var(--accent-text);font-size:.94rem;margin-top:5px;}
-  .blk .watch{color:var(--label-2);font-size:.86rem;margin-top:4px;}
-  .blk .adv{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
-  .blk .adv span{font-size:.8rem;background:var(--bg-nested);border:1px solid var(--sep);border-radius:7px;padding:3px 8px;}
-  .blk .meta{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-  .goalbox{background:var(--accent-tint);border:1px solid var(--accent-line);border-radius:12px;padding:12px 14px;margin-bottom:12px;}
-  .goalbox .lbl{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent-text);}
-  .goalbox .txt{margin-top:3px;font-size:1rem;color:var(--label);}
+  .blk{border:1px solid var(--sep);border-radius:var(--r-card);padding:var(--s-4);
+        margin-bottom:var(--s-3);background:var(--bg-card);box-shadow:var(--shadow-card);}
+  .blk .role{font-size:var(--fs-foot);font-weight:700;text-transform:uppercase;
+        letter-spacing:.06em;color:var(--label-2);}
+  /* The set line splits three ways by how often he looks at it: the call he
+     shouts, the qualifier that finishes it, the rest he re-reads. */
+  .blk .call{font-size:var(--fs-title-3);line-height:1.25;font-weight:700;margin-top:3px;}
+  .blk .rest{font-size:var(--fs-body);font-weight:600;margin-top:2px;
+        font-variant-numeric:tabular-nums;}
+  .blk .qual{font-size:var(--fs-callout);color:var(--label-2);margin-top:2px;}
+  .blk .cue{color:var(--accent-text);font-size:var(--fs-callout);margin-top:6px;}
+  .blk .watch{color:var(--label-2);font-size:var(--fs-sub);margin-top:4px;}
+  .blk .adv{display:flex;gap:var(--s-2);flex-wrap:wrap;margin-top:var(--s-2);}
+  .blk .adv span{font-size:var(--fs-sub);background:var(--bg-nested);
+        border:1px solid var(--sep);border-radius:7px;padding:3px 8px;}
+  .blk .meta{margin-top:var(--s-2);display:flex;gap:var(--s-2);flex-wrap:wrap;align-items:center;}
+  /* The rep pair used to sit 4px apart, which is inside one sigma of a wet
+     finger. Full width row, one at each end. The negative margin matches the
+     card padding exactly, so the two have to stay in step. */
+  .blk .blkact{display:flex;align-items:center;justify-content:space-between;
+        gap:var(--s-6);margin:var(--s-3) calc(var(--s-4) * -1) calc(var(--s-4) * -1);
+        padding:var(--s-2) var(--s-4);border-top:1px solid var(--sep);}
+  .blk .blkact .val{font-size:var(--fs-sub);color:var(--label-2);
+        font-variant-numeric:tabular-nums;text-align:center;flex:1 1 auto;}
+  .goalbox{background:var(--accent-tint);border:1px solid var(--accent-line);
+        border-radius:var(--r-inner);padding:var(--s-3) var(--s-4);margin-bottom:var(--s-3);}
+  .goalbox .lbl{font-size:var(--fs-cap);font-weight:700;text-transform:uppercase;
+        letter-spacing:.06em;color:var(--accent-text);}
+  .goalbox .txt{margin-top:3px;font-size:var(--fs-callout);color:var(--label);}
 
   /* ---------- history ---------- */
-  .hrow{display:flex;align-items:center;gap:10px;padding:0 4px;min-height:var(--ctl-h);border-bottom:1px solid var(--sep);font-size:.92rem;cursor:pointer;-webkit-tap-highlight-color:transparent;}
-  .hrow:last-child{border-bottom:none;}
-  .hrow:active{background:var(--fill-3);}
-  @media (hover:hover){ .hrow:hover{background:var(--fill-4);} }
-  .hdate{color:var(--label-2);white-space:nowrap;font-variant-numeric:tabular-nums;width:92px;flex-shrink:0;}
-  .hmain{flex:1;min-width:0;}
+  .hrow{font-size:var(--fs-body);}
+  .hdate{color:var(--label-2);white-space:nowrap;font-variant-numeric:tabular-nums;
+        min-width:5.5em;flex-shrink:0;font-size:var(--fs-sub);}
+  .hmain{flex:1 1 auto;min-width:0;}
   .htitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
   /* ---------- library ---------- */
-  .lrow{display:flex;align-items:flex-start;gap:10px;padding:9px 4px;border-bottom:1px solid var(--sep);font-size:.9rem;}
-  .lrow:last-child{border-bottom:none;}
-  .lrow .lmain{flex:1;min-width:0;}
+  .lrow{align-items:flex-start;}
+  .lrow .lmain{flex:1 1 auto;min-width:0;}
   .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
-  .filters input[type=search]{flex:1;min-width:130px;}
+  .filters input[type=search]{flex:1 1 auto;min-width:130px;}
+  .filters select{flex:0 1 auto;}
   .bar{height:8px;background:var(--fill-3);border-radius:var(--r-pill);overflow:hidden;}
-  .bar>i{display:block;height:100%;background:var(--accent);}
+  .bar>i{display:block;height:100%;background:var(--accent);
+        transition:width var(--dur-mid) var(--ease-out);}
 
-  /* ==========================================================================
-     Pool view: bright hall, wet fingers, phone at arm's length.
-
-     Literal black on literal white, never themed. Dark mode does not reach in
-     here: a large light field constricts the pupil, which lifts what you can
-     resolve, and a droplet on a dark screen scatters as a bright point.
-     ========================================================================== */
+  /* Pool view: bright hall, wet fingers, phone at arm's length. Literal black
+     on literal white, never themed. The 48px call is about 26 arcmin of cap
+     height at 70 cm against the ISO 9241 floor of 16. The old 1.55rem
+     breakpoint was 13.9 and worked directly against the brief, so it is gone. */
   #pool{
-    position:fixed;inset:0;z-index:200;overflow-y:auto;
+    /* These live here, not on :root. A var() inside a custom property is
+       substituted on the element that declares it, so declaring them on :root
+       froze --pool-scale at 1 and the Bigger text switch did nothing. Declared
+       here, #pool.big wins on the same element and the sizes really change. */
+    --pool-scale:1;
+    --pool-target:104px;        /* state changing, wet finger. See the note below. */
+    --pool-target-sm:76px;      /* reversible pool control */
+    --p-call:calc(48px * var(--pool-scale));
+    --p-rest:calc(34px * var(--pool-scale));
+    --p-qual:calc(30px * var(--pool-scale));
+    --p-cue:calc(30px * var(--pool-scale));
+    --p-adv:calc(26px * var(--pool-scale));
+    --p-role:calc(20px * var(--pool-scale));
+    --p-clock:calc(56px * var(--pool-scale));
+    --p-drift:calc(28px * var(--pool-scale));
+    --p-collapsed:calc(28px * var(--pool-scale));
+    --p-of:calc(24px * var(--pool-scale));
+    --p-btn:calc(30px * var(--pool-scale));    /* 17.6 arcmin at 70 cm */
+    position:fixed;inset:0;z-index:var(--z-pool);
+    overflow-y:auto;overscroll-behavior:contain;
     color-scheme:light;
-    --p-ink:#000; --p-paper:#fff;
-    --p-done-fill:#e8ecef;    /* black on it is 17.7, so it decorates only */
     background:var(--p-paper);color:var(--p-ink);
-    padding:calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 20px);
+    -webkit-user-select:none;user-select:none;touch-action:manipulation;
+    /* Water pools along the bezel and produces ghost touches there, and the
+       iOS system gesture strips live in those edges. Nothing tappable within
+       16px of any edge. A fixed box is laid out against the viewport, so it
+       names the insets itself. The top inset carries no extra padding: a
+       sticky child resolves its offset against the padding box, so anything
+       above it would be a gap the content scrolls through. */
+    padding:env(safe-area-inset-top)
+            max(var(--s-4),env(safe-area-inset-right))
+            calc(env(safe-area-inset-bottom) + var(--s-6))
+            max(var(--s-4),env(safe-area-inset-left));
   }
-  #pool .ptop{display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--p-paper);
-        padding:6px 0 10px;border-bottom:3px solid var(--p-ink);margin-bottom:12px;}
-  #pool .clock{font-size:1.9rem;font-weight:800;font-variant-numeric:tabular-nums;}
-  /* Behind schedule inverts rather than turning red. Red on white is the one
-     thing glare eats first, and it says nothing to a colour-blind eye. */
-  #pool .clock.behind{background:var(--p-ink);color:var(--p-paper);border-radius:8px;padding:0 8px;}
-  #pool .pgoal{font-size:1.1rem;font-weight:600;margin-bottom:14px;}
-  #pool .pblk{border:3px solid var(--p-ink);border-radius:16px;padding:14px;margin-bottom:12px;min-height:56px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
-  /* Done is marked with a word and a tick, on a fill dark enough to see. The
-     old pale grey on near white measured 2.34, which is unreadable at arm's
-     length, and going pale is a colour-only signal in any case. */
-  #pool .pblk.done{background:var(--p-done-fill);border-color:var(--p-ink);color:var(--p-ink);}
-  #pool .pblk.done .prole::after{content:" ✓ done";font-weight:800;}
-  #pool .pblk:active{background:var(--p-done-fill);}
-  #pool .pblk .prole{font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;}
-  #pool .pblk .pline{font-size:1.85rem;font-weight:800;line-height:1.2;margin-top:4px;}
-  #pool .pblk .pcue{font-size:1.25rem;margin-top:8px;font-weight:600;}
-  #pool .pblk .padv{font-size:1.05rem;margin-top:8px;}
-  #pool button{min-height:64px;font-size:1.05rem;font-weight:700;
-        border:3px solid var(--p-ink);background:var(--p-paper);color:var(--p-ink);border-radius:12px;}
-  #pool button:active{background:var(--p-done-fill);transform:none;}
+  /* Manual, off by default, never automatic. */
+  #pool.night{
+    --p-ink:#fff; --p-paper:#000; --p-done-fill:#1a1a1a;
+    --p-behind-ink:#000; --p-behind-fill:#fff;
+    color-scheme:dark;
+  }
+  #pool.big{ --pool-scale:1.2; }
   /* A hard guard so no future rule can leak the glass register onto the deck. */
   #pool *{-webkit-backdrop-filter:none !important;backdrop-filter:none !important;}
 
-  @media (max-width:560px){
-    .wrap{padding:10px 10px 60px;}
-    #pool .pblk .pline{font-size:1.55rem;}
+  /* 115px of the 763 usable: clock row 64, drift 36, padding and rule 15. */
+  #pool .ptop{
+    position:sticky;top:env(safe-area-inset-top);z-index:2;
+    background:var(--p-paper);color:var(--p-ink);
+    border-bottom:var(--p-border) solid var(--p-ink);
+    padding:var(--s-4) 0 8px;margin-bottom:var(--s-3);
   }
+  #pool .ptop .prow{display:flex;align-items:center;gap:var(--s-3);}
+  /* 64px is the absolute floor in pool view. Close is reversible and it has
+     to stay reachable without scrolling, so it takes the floor rather than
+     the 76px a footer control gets. */
+  #pool .ptop button{min-height:64px;font-size:var(--p-of);}
+  #pool .clock{font-size:var(--p-clock);font-weight:700;line-height:1.05;
+        font-variant-numeric:tabular-nums;}
+  /* Behind schedule inverts rather than turning red. Red on white is the one
+     thing glare eats first, and it says nothing to a colour-blind eye. */
+  #pool .clock.behind{background:var(--p-behind-fill);color:var(--p-behind-ink);
+        border-radius:8px;padding:0 8px;}
+  #pool .of{font-size:var(--p-of);font-weight:600;flex:1 1 auto;}
+  #pool .drift{font-size:var(--p-drift);font-weight:700;margin-top:2px;
+        font-variant-numeric:tabular-nums;}
+  #pool .drift.late{background:var(--p-behind-fill);color:var(--p-behind-ink);
+        display:inline-block;padding:2px 12px;border-radius:var(--r-pill);}
+  #pool .pgoal{font-size:var(--p-qual);font-weight:600;line-height:1.35;
+        margin-bottom:var(--s-4);}
+
+  #pool .pblk{
+    width:100%;                 /* a <button> shrinks to fit without this */
+    border:var(--p-border) solid var(--p-ink);border-radius:var(--r-pool);
+    background:var(--p-paper);color:var(--p-ink);
+    padding:var(--s-4);margin-bottom:var(--s-3);
+    display:flex;gap:var(--s-4);align-items:stretch;text-align:left;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #pool .pblk .pmain{flex:1 1 auto;min-width:0;}
+  #pool .prole{font-size:var(--p-role);font-weight:700;text-transform:uppercase;
+        letter-spacing:.08em;}
+  #pool .pcall{font-size:var(--p-call);line-height:1.15;font-weight:700;
+        letter-spacing:.01em;margin-top:6px;hyphens:none;overflow-wrap:break-word;}
+  #pool .prest{font-size:var(--p-rest);font-weight:700;line-height:1.3;margin-top:8px;
+        font-variant-numeric:tabular-nums;}
+  #pool .pqual{font-size:var(--p-qual);font-weight:600;line-height:1.35;margin-top:8px;}
+  #pool .pcue{font-size:var(--p-cue);font-weight:600;line-height:1.35;margin-top:10px;}
+  #pool .padv{font-size:var(--p-adv);font-weight:600;line-height:1.35;margin-top:8px;}
+
+  /* Done is marked three ways, none of them colour: the tick fills, the call
+     is struck through, and the card fill drops to #e8ecef, which keeps black
+     text at 17.68 so it is decoration and never the signal. The old pale
+     grey on near white measured 2.34, unreadable at arm's length. */
+  #pool .pblk.done{background:var(--p-done-fill);border-color:var(--p-ink);color:var(--p-ink);}
+  #pool .pblk.done .pcall{text-decoration:line-through;
+        text-decoration-thickness:4px;text-decoration-color:var(--p-ink);}
+  /* One block is open at a time. Opening another is reversible, so 76px is
+     the right target here and the 104px tick stays the only state change. */
+  #pool .pblk.collapsed{padding:var(--s-3) var(--s-4);align-items:center;
+        min-height:var(--pool-target-sm);cursor:pointer;}
+  #pool .pblk.collapsed:active{background:var(--p-done-fill);}
+  #pool .pblk.collapsed .pcall{font-size:var(--p-collapsed);margin-top:2px;}
+  #pool .pblk.collapsed .prest,
+  #pool .pblk.collapsed .pqual,
+  #pool .pblk.collapsed .pcue,
+  #pool .pblk.collapsed .padv{display:none;}
+  /* The word as well as the tick: three cues for done, none of them colour. */
+  #pool .pblk .mk{font-size:var(--p-collapsed);font-weight:700;flex:none;
+        white-space:nowrap;text-align:right;}
+
+  /* The tick strip: 104px comes from the wet finger error budget. Four
+     independent error sources at one sigma (wet capacitive centroid 3.0 mm,
+     targeting at 70 cm 2.0 mm, one handed glance 1.5 mm, cold fingers 1.0
+     mm) add in quadrature to 4.03 mm, and a 95% hit rate needs two times two
+     sigma, so 16.1 mm, which is 102 CSS px. */
+  #pool .ptick{
+    flex:none;width:var(--pool-target);min-width:var(--pool-target);
+    min-height:var(--pool-target);padding:0;
+    border:var(--p-border) solid var(--p-ink);border-radius:var(--r-pool);
+    background:var(--p-paper);color:var(--p-ink);
+    display:flex;align-items:center;justify-content:center;
+    font-size:52px;font-weight:700;line-height:1;
+  }
+  #pool .ptick.on{background:var(--p-ink);color:var(--p-paper);}
+  #pool .ptick:active{background:var(--p-ink);color:var(--p-paper);transform:none;}
+  #pool button{min-height:var(--pool-target-sm);font-size:var(--p-btn);font-weight:700;
+        border:var(--p-border) solid var(--p-ink);border-radius:var(--r-pool);
+        background:var(--p-paper);color:var(--p-ink);padding:0 var(--s-4);}
+  #pool button:active{background:var(--p-ink);color:var(--p-paper);transform:none;}
+  /* 48px apart, per the spacing rule in the error budget: one of these two
+     changes state and the other does not. */
+  #pool .pfoot{display:flex;gap:48px;margin-top:var(--s-6);}
+  #pool .pfoot button{flex:1 1 0;}
+
   @media print{
-    nav.tabs,button,header .spacer{display:none !important;}
+    .topbar,.tabbar,.scrim,.sheet,#pool,button{display:none !important;}
     body{background:#fff;color:#000;}
-    .card,.blk{box-shadow:none;border-color:#999;}
+    body>.wrap{padding:0;}
+    .largetitle{font-size:24pt;}
+    .card,.blk,.list-card,.tile,.tiles{box-shadow:none;border-color:#999;background:#fff;}
   }
 </style>
 </head>
 <body>
+<div class="topbar glass" id="topbar">
+  <button class="barbtn gone" id="bar-left"></button>
+  <div class="topbar-title" id="topbar-title"></div>
+  <button class="barbtn gone" id="bar-right"></button>
+</div>
+
 <div class="wrap">
-  <header>
-    <h1>🏊 W&amp;S Trainings</h1>
-    <span class="spacer"></span>
-    <span id="who"></span>
-  </header>
+  <h1 class="largetitle" id="largetitle">W&amp;S Trainings</h1>
   <div id="app"></div>
+</div>
+
+<!-- The tab bar, the top bar, the scrim and the sheet frame are static markup,
+     not built by the engine. The icons have to be inline SVG and h() cannot
+     build SVG: document.createElement("svg") gives an HTMLUnknownElement. -->
+<nav class="tabbar glass" id="tabbar" role="tablist">
+  <button class="tab" id="tab-today" role="tab" aria-label="Today">
+    <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="6.5" width="20" height="17.5" rx="4"/><path d="M4 12h20M9.5 3.5v4M18.5 3.5v4"/></svg>
+    <span class="lbl">Today</span>
+  </button>
+  <button class="tab" id="tab-history" role="tab" aria-label="History">
+    <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M14 8v6l4.5 2.5"/><path d="M4.5 14a9.5 9.5 0 1 0 3-6.9"/><path d="M4 4.5v3.6h3.6"/></svg>
+    <span class="lbl">History</span>
+  </button>
+  <button class="tab" id="tab-library" role="tab" aria-label="Library">
+    <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4.5" width="20" height="6" rx="2"/><rect x="4" y="12.5" width="20" height="6" rx="2"/><path d="M6.5 21.5h15"/></svg>
+    <span class="lbl">Library</span>
+  </button>
+  <button class="tab" id="tab-insights" role="tab" aria-label="Insights">
+    <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4.5 23.5h19"/><path d="M8 23.5V13M14 23.5V6.5M20 23.5v-6"/></svg>
+    <span class="lbl">Insights</span>
+  </button>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Options">
+  <div class="grabber"></div>
+  <div class="sheet-head" id="sheet-head"></div>
+  <div class="sheet-body" id="sheet-body"></div>
 </div>
 
 <script src="config.js"></script>
@@ -343,7 +845,6 @@
       var v = props[k];
       if (v == null || v === false) continue;
       if (k === "class") e.className = v;
-      else if (k === "html") e.innerHTML = v;
       else if (k === "style" && typeof v === "object") Object.assign(e.style, v);
       else if (k.slice(0,2) === "on" && typeof v === "function") e.addEventListener(k.slice(2), v);
       else if (v === true) e.setAttribute(k, "");
@@ -360,7 +861,165 @@
   }
   function clear(node){ while(node.firstChild) node.removeChild(node.firstChild); }
   var APP = document.getElementById("app");
-  var WHO = document.getElementById("who");
+
+  // ==========================================================================
+  // the shell: one glass top bar, one glass tab bar, one sheet frame. All four
+  // are static markup, so the engine only ever touches them through
+  // getElementById plus className, textContent, setAttribute and append.
+  // ==========================================================================
+  var TOPBAR    = document.getElementById("topbar");
+  var BARTITLE  = document.getElementById("topbar-title");
+  var BARL      = document.getElementById("bar-left");
+  var BARR      = document.getElementById("bar-right");
+  var BIGTITLE  = document.getElementById("largetitle");
+  var TABBAR    = document.getElementById("tabbar");
+  var SCRIM     = document.getElementById("scrim");
+  var SHEET     = document.getElementById("sheet");
+  var SHEETHEAD = document.getElementById("sheet-head");
+  var SHEETBODY = document.getElementById("sheet-body");
+
+  // Two switches he can reach without going into iOS Settings, plus the pool
+  // text size. Kept on the phone, because they are about this phone in this
+  // hall and not about the account.
+  var UI_KEY = "wstrain.ui.v1";
+  var ui = { solid:false, poolBig:false, poolNight:false };
+  try{
+    var rawUi = localStorage.getItem(UI_KEY);
+    if (rawUi){
+      var u = JSON.parse(rawUi) || {};
+      ui.solid = !!u.solid; ui.poolBig = !!u.poolBig; ui.poolNight = !!u.poolNight;
+    }
+  }catch(e){ /* private mode: the defaults are fine */ }
+  var kbdUp = false;
+  function paintBodyClass(){
+    document.body.className = ui.solid ? (kbdUp ? "solid kbd" : "solid")
+                                       : (kbdUp ? "kbd" : "");
+  }
+  function saveUi(){
+    try{ localStorage.setItem(UI_KEY, JSON.stringify(ui)); }catch(e){}
+    paintBodyClass();
+  }
+  paintBodyClass();
+
+  // One slot per bar button, because a view never needs two. The handler is
+  // swapped rather than the listener, so the button keeps exactly one.
+  var barAct = { left:null, right:null };
+  function barButton(el, spec){
+    if (!spec){ el.className = "barbtn gone"; el.textContent = ""; return null; }
+    el.className = "barbtn";
+    el.textContent = spec.label;
+    el.setAttribute("aria-label", spec.label);
+    return spec.onclick;
+  }
+  function setBar(title, left, right){
+    BIGTITLE.textContent = title;
+    BARTITLE.textContent = title;
+    barAct.left  = barButton(BARL, left);
+    barAct.right = barButton(BARR, right);
+  }
+  BARL.addEventListener("click", function(){ if (barAct.left) barAct.left(); });
+  BARR.addEventListener("click", function(){ if (barAct.right) barAct.right(); });
+
+  // One place decides what the chrome says, so a view can never leave the last
+  // view's title or bar button behind.
+  function shell(title, showTabs, left, right){
+    setBar(title, left, right);
+    TABBAR.className = "tabbar glass" + (showTabs ? "" : " gone");
+  }
+
+  var TABS = [["today","Today"],["history","History"],["library","Library"],["insights","Insights"]];
+  // Spelled out, not concatenated: the harness audits every id the engine looks
+  // up against the markup by reading the string inside getElementById.
+  var TABBTN = [ document.getElementById("tab-today"),
+                 document.getElementById("tab-history"),
+                 document.getElementById("tab-library"),
+                 document.getElementById("tab-insights") ];
+  TABBTN.forEach(function(btn, i){
+    if (btn) btn.addEventListener("click", function(){ nav(TABS[i][0]); });
+  });
+  function paintTabs(){
+    TABBTN.forEach(function(btn, i){
+      if (!btn) return;
+      // Pool view is a modal task, not a tab, so it leaves Today lit.
+      var on = view.name === TABS[i][0] ||
+               (view.name === "pool" && TABS[i][0] === "today");
+      btn.className = "tab" + (on ? " on" : "");
+      btn.setAttribute("aria-current", on ? "page" : "false");
+    });
+  }
+
+  // The large title scrolls with the content and the compact one fades in as it
+  // goes. A plain scroll listener, no observers: document.documentElement is
+  // outside what the engine is allowed to touch.
+  function onScroll(){
+    var y = window.pageYOffset || 0;
+    TOPBAR.className = "topbar glass" + (y > 28 ? " compact" : "");
+  }
+  window.addEventListener("scroll", onScroll);
+  // The tab bar steps out of the way of the iOS keyboard. Not visualViewport:
+  // the sandbox window does not have it and reading a listener off undefined
+  // throws before anything else runs.
+  document.addEventListener("focusin", function(e){
+    var t = e && e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")){
+      kbdUp = true; paintBodyClass();
+    }
+  });
+  document.addEventListener("focusout", function(){ kbdUp = false; paintBodyClass(); });
+
+  // ---------- sheets ----------
+  // Detents are CSS max-height values toggled by class, never measured: there
+  // is no getBoundingClientRect here.
+  function openSheet(title, size, build){
+    clear(SHEETBODY);
+    SHEETHEAD.textContent = title || "";
+    SHEET.setAttribute("aria-label", title || "Options");
+    build(SHEETBODY);
+    SHEET.className = size === "sm" ? "sheet sm on" : "sheet med on";
+    SCRIM.className = "scrim on";
+  }
+  function closeSheet(){
+    SHEET.className = "sheet";
+    SCRIM.className = "scrim";
+  }
+  SCRIM.addEventListener("click", closeSheet);
+
+  // ---------- grouped inset list ----------
+  // Every tappable row is a real button: a div with an onclick is invisible to
+  // VoiceOver, unreachable by keyboard and gets none of the free hit slop.
+  function listCard(){
+    var kids = [];
+    for (var i=0;i<arguments.length;i++) if (arguments[i]) kids.push(arguments[i]);
+    return h("div",{class:"list-card"}, kids);
+  }
+  function list(hdr, card, ftr){
+    return h("div",{class:"list"},
+      hdr ? h("div",{class:"list-hdr"}, hdr) : null,
+      card,
+      ftr ? h("div",{class:"list-ftr"}, ftr) : null);
+  }
+  // o: { title, sub, tert, val, tone, onclick, act, right }
+  function irow(o){
+    var cls = "irow" + (o.onclick ? " tap" : "") + (o.tone ? " " + o.tone : "") +
+              (o.act ? " act" : "");
+    var kids = [
+      h("div",{class:"r-main"},
+        h("div",{class:"r-1"}, o.title),
+        o.sub  ? h("div",{class:"r-2"}, o.sub)  : null,
+        o.tert ? h("div",{class:"r-3"}, o.tert) : null),
+      o.val ? h("div",{class:"r-val"}, o.val) : null,
+      o.right || null,
+      o.onclick && !o.act ? h("span",{class:"chev"},"›") : null
+    ];
+    if (!o.onclick) return h("div",{class:cls}, kids);
+    return h("button",{ class:cls, onclick:o.onclick }, kids);
+  }
+  function switchRow(label, on, onToggle){
+    var knob = h("i",null);
+    var sw = h("button",{ class:"sw" + (on ? " on" : ""), "aria-label":label,
+      "aria-pressed": on ? "true" : "false", onclick:onToggle }, knob);
+    return h("div",{class:"irow"}, h("div",{class:"r-main"}, h("div",{class:"r-1"},label)), sw);
+  }
 
   // ==========================================================================
   // dates — always Europe/Amsterdam. A naive toISOString() puts a Sunday
@@ -439,6 +1098,7 @@
   var offline = false, staleMirror = false;
   var poolState = null;           // { startedAt, timer }
   var lib = { q:"", role:"", focus:"", showProposed:false };
+  var hist = { q:"" };            // the History term, so a repaint cannot lose it
 
   var MIRROR_KEY = "wstrain.mirror.v1";
 
@@ -516,6 +1176,14 @@
     kick_set:"Legs", pull_set:"Arms", sprint_set:"Sprints", skill_set:"Skill set",
     turns:"Turns", open_water:"Open water", cooldown:"Cool-down", game:"Game",
     warmup:"Warm-up"
+  };
+  // The card used to print the raw database strings through replace("_"," "),
+  // which only replaces the FIRST underscore, so open_water_safe came out half
+  // raw. These are descriptions and not warnings: underwater work is normal in
+  // his coaching. Confirm the wording with him before changing it.
+  var SAFETY_LABEL = {
+    breath_control:"breath control", underwater:"underwater work",
+    max_effort:"maximum effort", open_water:"open water"
   };
 
   // ==========================================================================
@@ -1526,7 +2194,11 @@
       title:row.title, goal:row.goal, status:row.status,
       difficulty_rating:row.difficulty_rating, note:row.note,
       coach_id:row.coach_id, engine:row.engine, warnings:row.warnings || [],
-      warmup_minutes: warm ? (data.settings.warmup_minutes||10) : (data.settings.warmup_minutes||10),
+      // Both arms of the old ternary were byte identical, so the warm-up row was
+      // found and thrown away. The deck needs its id to tick it off.
+      warmup_minutes: (data.settings && data.settings.warmup_minutes) || 10,
+      warmItemId: warm ? warm.id : null,
+      warmDone: warm ? !!warm.done : false,
       blocks: mid.map(toBlock), endBlock: end ? toBlock(end) : null,
       planned_total_m:row.planned_total_m, planned_minutes:row.planned_minutes,
       steady_s:(row.generation_inputs && row.generation_inputs.steady_s) || null,
@@ -1539,6 +2211,7 @@
   // export
   // ==========================================================================
   function asPlainText(sk){
+    var S = data.settings || defaultSettings();
     var L = [];
     L.push("Advanced adults, " + fmtDayDate(sk.date) + (sk.slot && sk.slot !== "other" ? ", " + slotLabel(sk.slot).split(" ")[1] : ""));
     L.push("Goal: " + sk.goal);
@@ -1559,7 +2232,10 @@
     });
     if (sk.endBlock){
       var e = sk.endBlock;
-      L.push((e.block_role === "game" ? "Game (10 min)" : "Cool-down (5 min)") + ": " + e.rendered_text);
+      // These were hard coded while buildSkeleton read the settings, so the text
+      // lied the moment he changed game_minutes.
+      var eMin = e.block_role === "game" ? (S.game_minutes||10) : (S.cooldown_minutes||5);
+      L.push((e.block_role === "game" ? "Game" : "Cool-down") + " (" + eMin + " min): " + e.rendered_text);
       var w = e.watch_for || (e.game && e.game.how_it_works);
       if (w) L.push("  " + w);
       L.push("");
@@ -1597,13 +2273,18 @@
     try{ document.execCommand("copy"); toast("Copied."); }catch(e){ alert(t); }
     ta.remove();
   }
-  var toastEl = null;
+  var toastEl = null, toastTimer = null;
+  // The old toast was a glass banner at z-index 99 under a deck at 200, so every
+  // message raised on the pool deck was painted behind the deck.
   function toast(msg){
     if (toastEl) toastEl.remove();
-    toastEl = h("div",{ class:"banner ok", style:{position:"fixed",left:"50%",transform:"translateX(-50%)",
-      bottom:"24px",zIndex:"99",maxWidth:"90%",boxShadow:"0 2px 10px rgba(0,0,0,.15)"} }, msg);
+    if (toastTimer) clearTimeout(toastTimer);
+    toastEl = h("div",{ class: view.name === "pool" ? "toast pool" : "toast" }, msg);
     document.body.append(toastEl);
-    setTimeout(function(){ if (toastEl){ toastEl.remove(); toastEl = null; } }, 2600);
+    toastTimer = setTimeout(function(){
+      if (toastEl){ toastEl.remove(); toastEl = null; }
+      toastTimer = null;
+    }, 2600);
   }
 
   // ==========================================================================
@@ -1619,15 +2300,6 @@
     data = { focuses:[], library:[], games:[], sessions:[], items:{}, settings:null, coaches:[] };
     draft = null; notCoach = false;
   }
-  function renderWho(){
-    clear(WHO);
-    if (!sb || !session) return;
-    var name = coachRow ? coachRow.display_name : session.user.email;
-    WHO.append(
-      h("span",{class:"small muted",style:{marginRight:"8px"}}, name),
-      h("button",{class:"ghost small", onclick:signOut }, "Log out")
-    );
-  }
 
   // ==========================================================================
   // render
@@ -1635,12 +2307,15 @@
   function nav(n){ view.name = n; render(); }
 
   function render(){
-    renderWho();
+    // startPool and a tick both come straight to renderPool, so the overlay is
+    // torn down in both places.
     var pool = document.getElementById("pool");
-    if (pool) pool.remove();
+    if (pool && pool.remove) pool.remove();
     clear(APP);
+    paintTabs();
 
     if (!configured){
+      shell("W&S Trainings", false);
       APP.append(h("div",{class:"card stack"},
         h("h2",null,"Almost there, needs setup"),
         h("p",{class:"muted"},"This app is not connected to its database yet. Open ",
@@ -1650,24 +2325,21 @@
       return;
     }
     if (!window.supabase){
+      shell("W&S Trainings", false);
       APP.append(h("div",{class:"card"},
         h("p",null,"Couldn't load the database library. Check your internet connection and reload.")));
       return;
     }
-    if (!session) return renderLogin();
-    if (notCoach) return renderNotCoach();
+    if (!session){ shell("Log in", false); return renderLogin(); }
+    if (notCoach){ shell("Almost there", false); return renderNotCoach(); }
 
-    if (view.name === "pool" && draft) return renderPool();
+    // Pool view reads its own session, not the draft. They used to be the same
+    // variable, so opening the deck rewrote what Today was showing.
+    if (view.name === "pool" && poolState && poolState.sk) return renderPool();
 
-    if (offline) APP.append(h("div",{class:"banner"},
+    if (offline) APP.append(h("div",{class:"banner edge"},
       staleMirror ? "No connection, and the copy on this phone is more than ten days old. Generate will still work but check the sets."
                   : "No connection. Working from the copy saved on this phone. Nothing will be saved until you are back online."));
-
-    APP.append(h("nav",{class:"tabs"},
-      [["today","Today"],["history","History"],["library","Library"],["insights","Insights"]].map(function(p){
-        return h("button",{ class: view.name===p[0] ? "active" : "", onclick:function(){ nav(p[0]); } }, p[1]);
-      })
-    ));
 
     if (view.name === "history")  return renderHistory();
     if (view.name === "library")  return renderLibrary();
@@ -1676,11 +2348,12 @@
   }
 
   function renderLogin(){
-    var email = h("input",{type:"email",placeholder:"email",autocomplete:"username"});
-    var pass  = h("input",{type:"password",placeholder:"password",autocomplete:"current-password"});
+    var email = h("input",{type:"email",placeholder:"email",autocomplete:"username",
+      "aria-label":"Email"});
+    var pass  = h("input",{type:"password",placeholder:"password",autocomplete:"current-password",
+      "aria-label":"Password"});
     function go(){ signIn(email.value, pass.value); }
     APP.append(h("div",{class:"card stack login",style:{maxWidth:"420px",margin:"40px auto"}},
-      h("h2",null,"Log in"),
       h("p",{class:"muted small"},"Training generator for the Win and Swim advanced adults group."),
       email, pass,
       loginError ? h("div",{class:"err"}, loginError) : null,
@@ -1732,77 +2405,131 @@
       onclick:function(){ generateToday(opts(false)); } },
       generating ? "Writing today's training…" : (draft ? "Generate another" : "Generate today's training"));
 
-    APP.append(h("div",{class:"card stack"},
-      h("div",{class:"row wrap"},
-        h("div",null, h("div",{class:"section-label"},"Date"), dateInput),
-        h("div",null, h("div",{class:"section-label"},"Slot"), slotSel)),
-      h("div",{class:"row wrap"},
-        h("div",{style:{flex:"1",minWidth:"200px"}}, h("div",{class:"section-label"},"Ending"), endSel),
-        h("div",{style:{flex:"1",minWidth:"200px"}}, h("div",{class:"section-label"},"Focus"), focusSel)),
-      h("div",{class:"row"}, genBtn),
+    shell(draft ? fmtDayDate(draft.date) : "Today", true, null,
+      draft ? { label:"Pool", onclick:function(){ startPool(draft); } } : null);
+
+    // Four grouped rows carrying the real controls. iOS turns a date input and a
+    // select into its own picker sheet, so that is the native sheet for free and
+    // one less thing to hand build.
+    APP.append(list("Set up", listCard(
+      setupRow("Date", dateInput),
+      setupRow("Slot", slotSel),
+      setupRow("Ending", endSel),
+      setupRow("Focus", focusSel)),
+      "Leave Focus on the first option and the app picks one you have not done recently."));
+
+    APP.append(h("div",{style:{marginBottom:"16px"}}, genBtn,
       generating ? h("div",{class:"small muted"},
-        "Picking the focus, filling the 45 minutes, then Claude writes the coaching notes. About 30 seconds.") : null
-    ));
+        "Picking the focus, filling the 45 minutes, then Claude writes the coaching notes. About 30 seconds.") : null));
 
     if (!draft){
       APP.append(h("div",{class:"empty"},
-        "Press the button. The app picks a focus you have not done recently, fills the 45 minutes from the library, and never repeats a set inside six sessions."));
+        "Press the button. The app picks a focus you have not done recently, fills the 45 minutes from the library, and never repeats a set sooner than the library allows. The Library screen shows when each set comes back."));
       return;
     }
     renderSessionCard(draft, true);
   }
+  function setupRow(label, ctl){
+    return h("div",{class:"irow"},
+      h("div",{class:"r-main"}, h("div",{class:"r-1"}, label)), ctl);
+  }
 
   function renderSessionCard(sk, editable){
-    if (sk.fallbackNote) APP.append(h("div",{class:"banner"}, sk.fallbackNote));
-    (sk.relaxations || []).forEach(function(r){ APP.append(h("div",{class:"banner"}, r)); });
+    // Three kinds of message used to share one amber banner and could stack five
+    // deep, pushing the session off the first screen. Only the safety warnings
+    // should stop the eye, so the other two go quiet blue.
+    if (sk.fallbackNote) APP.append(h("div",{class:"banner info"}, sk.fallbackNote));
+    (sk.relaxations || []).forEach(function(r){ APP.append(h("div",{class:"banner info"}, r)); });
     (sk.warnings || []).forEach(function(w){ APP.append(h("div",{class:"banner"}, "Check this: " + w)); });
 
-    APP.append(h("div",{class:"card stack"},
+    var S = data.settings || defaultSettings();
+    var endMin = sk.ending === "game" ? (S.game_minutes||10) : (S.cooldown_minutes||5);
+    var mainM = (sk.blocks||[]).reduce(function(a,b){ return a+b.distance_m; },0);
+    // Five badges in one wrapping row at 11px was five things shouting. Date,
+    // slot and provenance are one quiet line; state stays a badge, because it is
+    // the only one he acts on.
+    var statusLine = [ fmtDayDate(sk.date),
+      sk.slot && sk.slot !== "other" ? slotLabel(sk.slot) : null,
+      fmtM(sk.planned_total_m||0),
+      (sk.planned_minutes||60) + " min",
+      sk.engine === "ai" ? "written by Claude" : "from the library"
+    ].filter(Boolean).join(" · ");
+
+    APP.append(h("div",{class:"card"},
       h("div",{class:"row wrap"},
         h("h2",{style:{flex:"1"}}, sk.title),
-        h("span",{class:"badge accent"}, fmtDayDate(sk.date)),
-        sk.slot && sk.slot !== "other" ? h("span",{class:"badge"}, slotLabel(sk.slot)) : null,
-        h("span",{class: sk.engine === "ai" ? "badge ok" : "badge"}, sk.engine === "ai" ? "Claude" : "library"),
         sk.status === "done" ? h("span",{class:"badge ok"},"done") : null,
-        sk.status === "skipped" ? h("span",{class:"badge warn"},"did not run") : null
-      ),
+        sk.status === "skipped" ? h("span",{class:"badge warn"},"did not run") : null),
+      h("div",{class:"small muted",style:{margin:"2px 0 12px"}}, statusLine),
       h("div",{class:"goalbox"},
         h("div",{class:"lbl"},"Today's goal"),
         h("div",{class:"txt"}, sk.goal)),
-      h("div",{class:"tiles"},
-        tile("Total", fmtM(sk.planned_total_m||0), "including warm-up"),
-        tile("Planned", (sk.planned_minutes||60) + " min", "for the slower half"),
-        tile("Main body", fmtM((sk.blocks||[]).reduce(function(a,b){ return a+b.distance_m; },0)), (sk.blocks||[]).length + " blocks"),
-        tile("Ending", sk.ending === "game" ? "Game" : "Cool-down", sk.ending === "game" ? "10 min" : "5 min")
-      ),
-      h("div",{class:"row wrap"},
-        h("button",{class:"primary",onclick:function(){ startPool(sk); }},"Start pool view"),
-        h("button",{onclick:function(){ copyText(asPlainText(sk)); }},"Copy as text"),
-        h("button",{onclick:function(){ window.print(); }},"Print"),
-        editable && !sk.saved && !offline ? h("button",{class:"good",onclick:function(){ saveDraft(null); }},"Save") : null,
-        sk.saved ? h("button",{class:"ghost",onclick:function(){ markStatus(sk, "done"); }},"Mark done") : null,
-        sk.saved ? h("button",{class:"ghost",onclick:function(){ markStatus(sk, "skipped"); }},"Did not run") : null
-      )
+      h("button",{class:"primary big",onclick:function(){ startPool(sk); }},"Start pool view")
     ));
 
+    APP.append(h("div",{class:"tiles"},
+      tile("Total", fmtM(sk.planned_total_m||0), "with warm-up"),
+      tile("Planned", (sk.planned_minutes||60) + " min", "slower half"),
+      tile("Main body", fmtM(mainM), (sk.blocks||[]).length + " blocks"),
+      tile("Ending", sk.ending === "game" ? "Game" : "Cool-down", endMin + " min")
+    ));
+
+    var warm = warmupText(sk);
     APP.append(h("div",{class:"blk"},
-      h("div",{class:"role"},"Warm-up · " + (sk.warmup_minutes||10) + " min"),
-      h("div",{class:"line"},"Easy swim, own pace"),
-      h("div",{class:"watch"},"No exercises. Loosen up and let them talk.")));
+      h("div",{class:"role"}, warm.role),
+      h("div",{class:"call"}, warm.call),
+      h("div",{class:"watch"}, warm.watch)));
 
     (sk.blocks||[]).forEach(function(b, i){ APP.append(blockCard(b, i, sk, editable)); });
 
     if (sk.endBlock){
-      var e = sk.endBlock;
+      var e = sk.endBlock, es = splitCall(e.rendered_text);
       APP.append(h("div",{class:"blk"},
-        h("div",{class:"role"}, e.block_role === "game" ? "Game · 10 min" : "Cool-down · 5 min"),
-        h("div",{class:"line"}, e.rendered_text),
+        h("div",{class:"role"}, (e.block_role === "game" ? "Game" : "Cool-down") + " · " + endMin + " min"),
+        h("div",{class:"call"}, es.call),
+        es.qual ? h("div",{class:"qual"}, es.qual) : null,
         (e.cue || (e.item && e.item.cue)) ? h("div",{class:"cue"}, e.cue || e.item.cue) : null,
         (e.watch_for || (e.game && e.game.how_it_works)) ?
           h("div",{class:"watch"}, e.watch_for || e.game.how_it_works) : null));
     }
 
+    // Six equal buttons in one row become one grouped list, in the order he uses
+    // them, every row full width and 44px.
+    var acts = [];
+    if (editable && !sk.saved && !offline)
+      acts.push(irow({ title:"Save", tone:"r-good", act:true, onclick:function(){ saveDraft(null); } }));
+    if (sk.saved){
+      acts.push(irow({ title:"Mark done", act:true, onclick:function(){ markStatus(sk, "done"); } }));
+      acts.push(irow({ title:"Did not run", act:true, onclick:function(){ markStatus(sk, "skipped"); } }));
+    }
+    // The already-saved alert has promised this control since day one and it did
+    // not exist: replace:true was produced nowhere in the file.
+    acts.push(irow({ title:"Regenerate", act:true, onclick:function(){ askRegenerate(sk); } }));
+    acts.push(irow({ title:"Copy as text", act:true, onclick:function(){ copyText(asPlainText(sk)); } }));
+    acts.push(irow({ title:"Print", act:true, onclick:function(){ window.print(); } }));
+    APP.append(list(null, h("div",{class:"list-card"}, acts),
+      "Print is a prep-at-home action. On the phone it opens the iOS print sheet."));
+
     if (sk.saved) APP.append(feedbackCard(sk));
+  }
+  // The warm-up wording lived in four places and had already started to drift.
+  function warmupText(sk){
+    return { role:"Warm-up · " + (sk.warmup_minutes||10) + " min",
+             call:"Easy swim, own pace",
+             watch:"No exercises. Loosen up and let them talk." };
+  }
+  function askRegenerate(sk){
+    openSheet("Generate a new one?", "sm", function(body){
+      body.append(
+        h("p",{class:"small muted"},"This replaces the training for " +
+          fmtDayDate(sk.date) + ". Its sets go back in the rotation."),
+        h("button",{class:"primary big",onclick:function(){
+          closeSheet();
+          generateToday({ date:sk.date, slot:sk.slot, group:sk.group_level || "advanced",
+            ending:sk.ending, focusKey:null, replace:true });
+        }},"Generate a new one"),
+        h("button",{class:"big",style:{marginTop:"12px"},onclick:closeSheet},"Keep this one"));
+    });
   }
 
   function tile(lbl, val, sub){
@@ -1811,6 +2538,7 @@
   }
 
   function blockCard(b, i, sk, editable){
+    var s = splitCall(b.rendered_text);
     var rest = restText(b), a1 = advText(b,1), a2 = advText(b,2);
     var cue = b.cue || (b.item && b.item.cue);
     var watch = b.watch_for || (b.item && b.item.watch_for);
@@ -1818,7 +2546,9 @@
     return h("div",{class:"blk"},
       h("div",{class:"role"}, (ROLE_LABEL[b.block_role] || b.block_role) +
         (b.distance_m ? " · " + b.distance_m + " m" : "")),
-      h("div",{class:"line"}, b.rendered_text + (rest ? ", " + rest : "")),
+      h("div",{class:"call"}, s.call),
+      s.qual ? h("div",{class:"qual"}, s.qual) : null,
+      rest ? h("div",{class:"rest"}, rest) : null,
       cue ? h("div",{class:"cue"}, cue) : null,
       watch ? h("div",{class:"watch"}, watch) : null,
       (a1 || a2) ? h("div",{class:"adv"},
@@ -1828,11 +2558,15 @@
         gear.length ? h("span",{class:"badge"}, gear.join(" + ")) : null,
         (b.item && b.item.effort) ? h("span",{class:"badge"}, b.item.effort) : null,
         ((b.item && b.item.safety_tags) || []).map(function(t){
-          return h("span",{class:"badge warn"}, t.replace("_"," ")); }),
-        editable && !sk.saved && b.item && b.item.reps ? h("span",{class:"row",style:{gap:"4px"}},
-          h("button",{class:"small",onclick:function(){ nudge(sk, i, -1); }},"−1 rep"),
-          h("button",{class:"small",onclick:function(){ nudge(sk, i, +1); }},"+1 rep")) : null
-      ));
+          return h("span",{class:"badge warn"}, SAFETY_LABEL[t] || t.replace(/_/g," ")); })),
+      // The rep pair sat 4px apart, which is inside one sigma of a wet finger,
+      // and it vanished once the session was saved, which left no way to adjust
+      // a saved session at all. Now it is one full width row, one at each end.
+      editable && b.item && b.item.reps ? h("div",{class:"blkact"},
+        h("button",{class:"small plain",onclick:function(){ nudge(sk, i, -1); }},"−1 rep"),
+        h("div",{class:"val"}, fmtM(b.distance_m||0)),
+        h("button",{class:"small plain",onclick:function(){ nudge(sk, i, +1); }},"+1 rep")) : null
+    );
   }
 
   // deterministic manual adjustment, and the clock is recomputed straight away
@@ -1852,25 +2586,35 @@
   }
 
   function feedbackCard(sk){
-    var note = h("textarea",{ placeholder:"One line for next time (optional)" }, sk.note || "");
+    var note = h("textarea",{ placeholder:"One line for next time (optional)",
+      "aria-label":"One line for next time" }, sk.note || "");
     var rates = [1,2,3,4,5].map(function(n){
       return h("button",{ class: sk.difficulty_rating === n ? "primary small" : "small",
+        "aria-label":"How hard: " + n + " of 5",
         onclick:function(){ setRating(sk, n); } }, String(n));
     });
+    // Save note used to be squeezed to 85px wide by the sentence beside it, with
+    // its label wrapped onto two lines. Each thing gets its own row.
     return h("div",{class:"card stack"},
       h("div",{class:"section-label"},"After the session"),
-      h("div",{class:"row wrap"},
-        h("span",{class:"small muted"},"How hard was it? 1 easy, 5 too hard"), rates),
+      h("div",{class:"small muted"},"How hard was it? 1 easy, 5 too hard"),
+      h("div",{class:"seg"}, rates),
       note,
-      h("div",{class:"row"},
-        h("button",{onclick:function(){ saveNote(sk, note.value); }},"Save note"),
-        h("span",{class:"tiny muted"},"Saved with the session, so you can look back at what landed hard.")));
+      h("button",{style:{width:"100%"},onclick:function(){ saveNote(sk, note.value); }},"Save note"),
+      h("div",{class:"tiny muted"},"Saved with the session, so you can look back at what landed hard."));
   }
   async function markStatus(sk, status){
-    if (!sk.id) return;
+    // Mark done on the deck for a session that was never saved used to return
+    // here in silence, from a 76px button, with no explanation.
+    if (!sk.id){
+      if (view.name === "pool") leavePool();
+      toast("Not saved yet, so there is nothing to mark.");
+      return;
+    }
     await mutate(function(){ return sb.from("tr_sessions").update({ status:status }).eq("id", sk.id); }, true);
     sk.status = status;
-    draft = hydrate(data.sessions.filter(function(s){ return s.id === sk.id; })[0]) || sk;
+    if (draft && draft.id === sk.id)
+      draft = hydrate(data.sessions.filter(function(s){ return s.id === sk.id; })[0]) || draft;
     render(); toast(status === "done" ? "Marked done." : "Marked as not run, so its sets go back in the rotation.");
   }
   async function setRating(sk, n){
@@ -1885,75 +2629,214 @@
   }
 
   // ------------------------------------------------------------- Pool view ---
+  // Bright hall, wet fingers, phone at arm's length. One block is open at a time
+  // and the only thing on the deck that changes state is the 104px tick strip.
   function startPool(sk){
-    draft = sk; view.name = "pool";
-    poolState = { startedAt: Date.now() };
+    // Close used to destroy poolState, so the clock was gone with no way back.
+    // Now it survives, and reopening the same session resumes it.
+    var key = (sk.id || 0) + "|" + sk.date;
+    if (!poolState || poolState.key !== key)
+      poolState = { key:key, sk:sk, startedAt: Date.now(), timer:null, openIdx:null };
+    poolState.sk = sk;
+    view.name = "pool";
     render();
   }
+  function leavePool(){
+    if (poolState && poolState.timer){ clearTimeout(poolState.timer); poolState.timer = null; }
+    var old = document.getElementById("pool");
+    if (old && old.remove) old.remove();
+    view.name = "today";
+    render();
+  }
+  // "8 x 50 free, building" is three things read at three different rates: the
+  // call he shouts, the rest he re-reads during the set, and the qualifier he
+  // reads once before it starts. At 48px a 375px screen fits about 11
+  // characters, so the whole string on one line wraps to four.
+  var CALL_RE = /^\s*(\d+\s*[x×]\s*\d+(?:\s*m)?|\d+\s*m)\s*(.*)$/i;
+  function splitCall(t){
+    var s = String(t == null ? "" : t);
+    var m = CALL_RE.exec(s);
+    if (!m) return { call:s, qual:"" };
+    return { call: m[1].replace(/\s+/g," ").trim(), qual: m[2] };
+  }
+  function poolRole(b, sk){
+    if (b.block_role === "warmup") return warmupText(sk).role;
+    return (ROLE_LABEL[b.block_role] || b.block_role) +
+           (b.distance_m ? " · " + b.distance_m + " m" : "");
+  }
+  // The deck is the warm-up, the sets and the ending, in the order they happen.
+  // The warm-up is ten of the sixty minutes, so it is a block he can tick off.
+  function poolDeck(sk){
+    if (!sk.warmBlock) sk.warmBlock = { block_role:"warmup", distance_m:0,
+      itemId: sk.warmItemId || null, done: !!sk.warmDone };
+    sk.warmBlock.rendered_text = warmupText(sk).call;
+    var deck = [sk.warmBlock];
+    (sk.blocks || []).forEach(function(b){ deck.push(b); });
+    if (sk.endBlock) deck.push(sk.endBlock);
+    return deck;
+  }
+  var lastScrollAt = 0, lastToggleAt = 0;
   function renderPool(){
-    var sk = draft, S = data.settings || defaultSettings();
+    var sk = poolState.sk, S = data.settings || defaultSettings();
+    // render() takes the overlay down too, but startPool and a tick both come
+    // straight here, so this has to clean up after itself.
+    var old = document.getElementById("pool");
+    if (old && old.remove) old.remove();
+    if (poolState.timer){ clearTimeout(poolState.timer); poolState.timer = null; }
+
     var pool = h("div",{id:"pool"});
-    var clock = h("div",{class:"clock"},"0:00");
-    var plannedS = ((sk.planned_minutes||60)) * 60;
+    pool.className = ui.poolBig ? (ui.poolNight ? "big night" : "big")
+                                : (ui.poolNight ? "night" : "");
+    var deck = poolDeck(sk);
+    var open = poolState.openIdx;
+    if (open == null || !deck[open]){
+      open = 0;
+      for (var i=0;i<deck.length;i++) if (!deck[i].done){ open = i; break; }
+    }
+    // The digits change every second, so a live region would announce a number
+    // once a second. The reading is on the container instead.
+    var clock = h("div",{class:"clock","aria-hidden":"true"},"0:00");
+    var drift = h("div",{class:"drift"},"tick a set to keep the clock honest");
+    var plannedS = (sk.planned_minutes||60) * 60;
+    // Progress is measured in minutes, not metres: the warm-up and the ending
+    // have no metres at all and take a quarter of the hour between them.
+    function blockSeconds(b){
+      if (b.block_role === "warmup")   return (sk.warmup_minutes||10) * 60;
+      if (b.block_role === "game")     return (S.game_minutes||10) * 60;
+      if (b.block_role === "cooldown") return (S.cooldown_minutes||5) * 60;
+      return costOne(b.distance_m||0, S.pace_steady_s_per_100, S);
+    }
+    var totalS = 0;
+    deck.forEach(function(b){ totalS += blockSeconds(b); });
+    if (totalS <= 0) totalS = plannedS || 1;
 
     function tick(){
       if (!poolState) return;
       var el = Math.round((Date.now() - poolState.startedAt)/1000);
       clock.textContent = mmss(el);
-      // how far through the planned session should we be by now
-      var doneM = 0, totalM = sk.planned_total_m || 1;
-      (sk.blocks||[]).forEach(function(b){ if (b.done) doneM += b.distance_m; });
-      var expected = plannedS * (doneM / totalM);
-      clock.className = "clock" + (el > expected + 240 && doneM > 0 ? " behind" : "");
+      var doneS = 0;
+      deck.forEach(function(b){ if (b.done) doneS += blockSeconds(b); });
+      var expected = plannedS * (doneS / totalS);
+      clock.className = "clock" + (el > expected + 240 && doneS > 0 ? " behind" : "");
+      // He needs "am I on time", not "what time is it", so the drift is a signed
+      // number of minutes, read in one fixation. It stays quiet until something
+      // is ticked, because before that there is nothing to compare against and
+      // it would only be nagging.
+      if (doneS <= 0){
+        drift.textContent = "tick a set to keep the clock honest";
+        drift.className = "drift";
+      } else {
+        var off = Math.round((el - expected)/60);
+        drift.textContent = Math.abs(off) < 2 ? "on time"
+          : (off > 0 ? "+" + off + " min" : "−" + (-off) + " min");
+        drift.className = "drift" + (off > 5 ? " late" : "");
+      }
       poolState.timer = setTimeout(tick, 1000);
     }
-    if (poolState && poolState.timer) clearTimeout(poolState.timer);
     tick();
 
     pool.append(h("div",{class:"ptop"},
-      clock,
-      h("span",{class:"small"}, "of " + (sk.planned_minutes||60) + " min"),
-      h("span",{style:{flex:"1"}}),
-      h("button",{ onclick:function(){
-        if (poolState && poolState.timer) clearTimeout(poolState.timer);
-        poolState = null; view.name = "today"; render();
-      } }, "Close")));
+      h("div",{class:"prow"},
+        clock,
+        h("div",{class:"of"}, "of " + (sk.planned_minutes||60) + " min"),
+        h("button",{onclick:leavePool},"Close")),
+      drift));
 
     pool.append(h("div",{class:"pgoal"}, sk.goal));
 
-    pool.append(h("div",{class:"pblk"},
-      h("div",{class:"prole"},"Warm-up · " + (sk.warmup_minutes||10) + " min"),
-      h("div",{class:"pline"},"Easy swim, own pace")));
+    deck.forEach(function(b, idx){ pool.append(poolBlock(b, idx, idx === open, sk)); });
 
-    (sk.blocks||[]).forEach(function(b){
-      var rest = restText(b), a1 = advText(b,1), a2 = advText(b,2);
-      var el = h("div",{ class:"pblk" + (b.done ? " done" : ""), onclick:function(){ togglePool(b, el); } },
-        h("div",{class:"prole"}, (ROLE_LABEL[b.block_role]||b.block_role) + (b.distance_m ? " · " + b.distance_m + " m" : "")),
-        h("div",{class:"pline"}, b.rendered_text + (rest ? ", " + rest : "")),
-        (b.cue || (b.item && b.item.cue)) ? h("div",{class:"pcue"}, b.cue || b.item.cue) : null,
-        (a1 || a2) ? h("div",{class:"padv"},
-          (a1 ? "Adv 1: " + a1 : "") + (a1 && a2 ? "    " : "") + (a2 ? "Adv 2: " + a2 : "")) : null);
-      pool.append(el);
-    });
+    // 48px apart. Mark done used to sit 10px from Copy, which is inside one
+    // sigma of a wet finger, and only one of the two changes anything.
+    pool.append(h("div",{class:"pfoot"},
+      h("button",{onclick:function(){ markStatus(sk,"done"); }},"Mark done"),
+      h("button",{onclick:function(){ copyText(asPlainText(sk)); }},"Copy")));
 
-    if (sk.endBlock){
-      var e = sk.endBlock;
-      pool.append(h("div",{class:"pblk"},
-        h("div",{class:"prole"}, e.block_role === "game" ? "Game · 10 min" : "Cool-down · 5 min"),
-        h("div",{class:"pline"}, e.rendered_text),
-        (e.watch_for || (e.game && e.game.how_it_works)) ?
-          h("div",{class:"pcue"}, e.watch_for || e.game.how_it_works) : null));
-    }
-
-    pool.append(h("div",{class:"row",style:{marginTop:"16px",gap:"10px"}},
-      h("button",{style:{flex:"1"},onclick:function(){ markStatus(sk,"done"); }},"Mark done"),
-      h("button",{style:{flex:"1"},onclick:function(){ copyText(asPlainText(sk)); }},"Copy")));
-
+    pool.addEventListener("scroll", function(){ lastScrollAt = Date.now(); });
     document.body.append(pool);
+    // Bring the open block up under the sticky clock without measuring anything:
+    // there is no getBoundingClientRect here, and every collapsed row is one
+    // known height, so the offset is arithmetic. This also puts the deck back
+    // where it was after a background refresh repaints it. It has to come after
+    // the append, because a detached box cannot scroll.
+    pool.scrollTop = open * 88;
   }
-  async function togglePool(b, el){
+  function poolBlock(b, idx, open, sk){
+    var s = splitCall(b.rendered_text);
+    var rest = restText(b);
+    var cue = b.cue || (b.item && b.item.cue) || (b.game && b.game.how_it_works);
+    var a1 = advText(b,1), a2 = advText(b,2);
+    var main = h("div",{class:"pmain"},
+      h("div",{class:"prole"}, poolRole(b, sk)),
+      h("div",{class:"pcall"}, s.call),
+      s.qual ? h("div",{class:"pqual"}, s.qual) : null,
+      rest ? h("div",{class:"prest"}, rest) : null,
+      cue ? h("div",{class:"pcue"}, cue) : null,
+      (a1 || a2) ? h("div",{class:"padv"},
+        (a1 ? "Adv 1: " + a1 : "") + (a1 && a2 ? "    " : "") + (a2 ? "Adv 2: " + a2 : "")) : null);
+    if (open){
+      var strip = h("button",{ class:"ptick" + (b.done ? " on" : ""),
+        "aria-label": b.done ? "Not done after all" : "Done",
+        "aria-pressed": b.done ? "true" : "false" }, b.done ? "✓" : "");
+      armTick(strip, b, sk);
+      return h("div",{ class:"pblk" + (b.done ? " done" : "") }, main, strip);
+    }
+    // A collapsed row only opens itself. That is reversible and costs nothing,
+    // so it does not need the 104px target the tick strip does.
+    return h("button",{ class:"pblk collapsed" + (b.done ? " done" : ""),
+      onclick:function(){ if (poolState){ poolState.openIdx = idx; renderPool(); } } },
+      main, h("span",{class:"mk"}, b.done ? "✓ done" : ""));
+  }
+  // One tap stays one tap. What changes is that the tap has to have a plausible
+  // shape and must not coincide with a scroll. Safari on iOS reports a constant
+  // for touch width and height and zero force on most iPhones, so contact area
+  // is not a usable signal: the gate is geometry and timing only.
+  function armTick(strip, b, sk){
+    var down = null;
+    function poolTop(){
+      var pe = document.getElementById("pool");
+      var v = pe ? pe.scrollTop : null;
+      return typeof v === "number" ? v : null;
+    }
+    strip.addEventListener("pointerdown", function(e){
+      down = { x:e.clientX, y:e.clientY, t:Date.now(), moved:0, top:poolTop() };
+    });
+    strip.addEventListener("pointermove", function(e){
+      if (down){
+        var dx = e.clientX - down.x, dy = e.clientY - down.y;
+        down.moved = Math.sqrt(dx*dx + dy*dy);
+      }
+    });
+    strip.addEventListener("pointercancel", function(){ down = null; });
+    strip.addEventListener("click", function(){
+      var d = down, now = Date.now();
+      down = null;
+      // A wet fingertip lands off centre. This file puts that spread at 3.0 mm,
+      // which is about 18 px at this density, so 36 px is two sigma and accepts
+      // the taps this gate exists to serve. The old 10 px was half a sigma and
+      // rejected most of them.
+      if (d && d.moved > 36) return;
+      // Holding longer is the opposite of an accident, so only a hand genuinely
+      // parked on the glass is refused.
+      if (d && now - d.t > 5000) return;
+      // Whether the deck moved under the finger, not whether it moved recently.
+      // iOS keeps firing scroll all through momentum, about a second after the
+      // finger lifts, so a wall clock test rejects flick then tap.
+      var topNow = poolTop();
+      if (d && d.top !== null && topNow !== null && topNow !== d.top) return;
+      if (now - lastToggleAt < 400) return;                // global cooldown
+      if (b.tickedAt && now - b.tickedAt < 1500) return;   // water bridging a double fire
+      lastToggleAt = b.tickedAt = now;
+      togglePool(b, sk);
+    });
+  }
+  async function togglePool(b, sk){
     b.done = !b.done;
-    el.className = "pblk" + (b.done ? " done" : "");
+    if (b.block_role === "warmup") sk.warmDone = b.done;
+    // Paint first. The write can be slow or offline, and the next block has to
+    // come up under his thumb straight away.
+    if (poolState) poolState.openIdx = null;
+    renderPool();
     if (b.itemId && sb && session && !offline){
       try{ await sb.from("tr_session_items").update({ done:b.done }).eq("id", b.itemId); }catch(e){}
     }
@@ -1961,11 +2844,14 @@
 
   // -------------------------------------------------------------- History ---
   function renderHistory(){
-    var q = h("input",{ type:"search", placeholder:"Search titles and sets" });
-    var box = h("div",{class:"card"});
+    shell("History", true);
+    var q = h("input",{ type:"search", placeholder:"Search titles and sets",
+      "aria-label":"Search titles and sets", value:hist.q });
+    var box = h("div",null);
     function draw(){
-      clear(box);
-      var term = (q.value||"").toLowerCase();
+      hist.q = q.value || "";     // the term was rebuilt on every repaint, so any
+      clear(box);                 // background refresh wiped what he had typed
+      var term = hist.q.toLowerCase();
       var rows = data.sessions.filter(function(s){
         if (!term) return true;
         if ((s.title||"").toLowerCase().indexOf(term) !== -1) return true;
@@ -1973,37 +2859,36 @@
           return (i.rendered_text||"").toLowerCase().indexOf(term) !== -1; });
       });
       if (!rows.length){ box.append(h("div",{class:"empty"},"Nothing saved yet.")); return; }
-      var lastWeek = null;
+      var lastWeek = null, card = null;
       rows.forEach(function(s){
         var wk = weekLabel(s.session_date);
-        if (wk !== lastWeek){ box.append(h("div",{class:"section-label",style:{marginTop:"12px"}}, wk)); lastWeek = wk; }
+        if (wk !== lastWeek){
+          card = h("div",{class:"list-card"});
+          box.append(h("div",{class:"list"}, h("div",{class:"list-hdr"}, wk), card));
+          lastWeek = wk;
+        }
         var coach = (data.coaches||[]).filter(function(c){ return c.id === s.coach_id; })[0];
-        box.append(h("div",{ class:"hrow", onclick:function(){
+        card.append(h("button",{ class:"irow tap hrow", onclick:function(){
             draft = hydrate(s); view.name = "today"; render(); window.scrollTo(0,0);
           } },
           h("div",{class:"hdate"}, fmtDate(s.session_date)),
           h("div",{class:"hmain"},
             h("div",{class:"htitle"}, s.title),
-            h("div",{class:"tiny muted"},
+            h("div",{class:"r-3"},
               [ s.slot && s.slot !== "other" ? slotLabel(s.slot) : null,
                 fmtM(s.planned_total_m||0),
                 coach ? coach.display_name : null,
                 s.status === "done" ? "done" : (s.status === "skipped" ? "did not run" : "planned")
               ].filter(Boolean).join(" · "))),
           s.difficulty_rating ? h("span",{class:"badge"}, s.difficulty_rating + "/5") : null,
-          s.engine === "ai" ? h("span",{class:"badge ok"},"Claude") : h("span",{class:"badge"},"library")
+          s.engine === "ai" ? h("span",{class:"badge ok"},"Claude") : h("span",{class:"badge"},"library"),
+          h("span",{class:"chev"},"›")
         ));
       });
     }
     q.addEventListener("input", draw);
     APP.append(h("div",{class:"filters"}, q));
     APP.append(box); draw();
-
-    var lastThu = data.sessions.filter(function(s){ return s.slot === "thu_1930"; })[0];
-    if (lastThu) APP.append(h("div",{class:"card"},
-      h("div",{class:"section-label"},"Quick look"),
-      h("button",{onclick:function(){ draft = hydrate(lastThu); view.name="today"; render(); window.scrollTo(0,0); }},
-        "What did we do last Thursday?")));
   }
   function weekLabel(iso){
     var d = new Date(iso + "T12:00:00Z");
@@ -2014,23 +2899,27 @@
 
   // -------------------------------------------------------------- Library ---
   function renderLibrary(){
+    shell("Library", true, null, { label:"Ask Claude", onclick:function(){ askClaude(null); } });
     var roles = {};
     data.library.forEach(function(x){ roles[x.role] = (roles[x.role]||0)+1; });
     var proposed = data.library.filter(function(x){ return (x.status||"active") === "proposed"; });
 
-    var q = h("input",{type:"search",placeholder:"Search the library",value:lib.q});
-    var roleSel = h("select",{class:"small"}, [h("option",{value:""},"All roles")].concat(
+    var q = h("input",{type:"search",placeholder:"Search the library",value:lib.q,
+      "aria-label":"Search the library"});
+    var roleSel = h("select",{class:"small","aria-label":"Filter by role"},
+      [h("option",{value:""},"All roles")].concat(
       Object.keys(roles).sort().map(function(r){ return h("option",{value:r}, (ROLE_LABEL[r]||r) + " (" + roles[r] + ")"); })));
     roleSel.value = lib.role;
-    var focusSel = h("select",{class:"small"}, [h("option",{value:""},"All focuses")].concat(
+    var focusSel = h("select",{class:"small","aria-label":"Filter by focus"},
+      [h("option",{value:""},"All focuses")].concat(
       data.focuses.map(function(f){ return h("option",{value:f.key}, f.name); })));
     focusSel.value = lib.focus;
 
-    var box = h("div",{class:"card"});
+    var box = h("div",null);
     function draw(){
       lib.q = q.value; lib.role = roleSel.value; lib.focus = focusSel.value;
       clear(box);
-      var hist = historyForRepeat({ group:"advanced", date: todayISO() });
+      var hist2 = historyForRepeat({ group:"advanced", date: todayISO() });
       var S = data.settings || defaultSettings();
       var term = lib.q.toLowerCase();
       var rows = data.library.filter(function(x){
@@ -2048,76 +2937,114 @@
         var k = x.role + (x.whole_body ? ":whole" : "");
         roleCounts[k] = (roleCounts[k]||0)+1;
       });
+      var card = h("div",{class:"list-card"});
+      box.append(h("div",{class:"list"},
+        h("div",{class:"list-hdr"}, rows.length + (rows.length === 1 ? " set" : " sets")), card));
       rows.forEach(function(x){
-        var since = sessionsSinceItem(hist, x.id);
+        var since = sessionsSinceItem(hist2, x.id);
         var win = effectiveWindow(x, roleCounts[x.role + (x.whole_body ? ":whole" : "")]||1, S);
         var locked = since < win;
-        box.append(h("div",{class:"lrow"},
+        card.append(h("div",{class:"irow lrow"},
           h("div",{class:"lmain"},
-            h("div",{style:{fontWeight:"600"}}, x.name,
-              locked ? h("span",{class:"badge warn",style:{marginLeft:"6px"}},
-                "back in " + (win - since) + " session" + (win-since===1?"":"s")) : null,
-              x.source === "ai" ? h("span",{class:"badge accent",style:{marginLeft:"6px"}},"Claude") : null),
-            h("div",{class:"small muted"}, x.structure + (x.rest ? ", " + x.rest : "")),
-            h("div",{class:"tiny muted"},
+            h("div",{class:"r-1"}, x.name),
+            h("div",{class:"r-2"}, x.structure + (x.rest ? ", " + x.rest : "")),
+            h("div",{class:"r-3"},
               [ ROLE_LABEL[x.role]||x.role,
                 (x.equipment||[]).join(" + ") || "no gear",
                 "used " + (x.times_used||0) + "x",
                 x.last_used_on ? "last " + fmtDate(x.last_used_on) : "never used"
-              ].join(" · "))),
-          h("button",{class:"ghost small",onclick:function(){ toggleActive(x); }},"Retire")
+              ].join(" · ")),
+            (locked || x.source === "ai") ? h("div",{class:"row wrap",style:{marginTop:"6px"}},
+              locked ? h("span",{class:"badge warn"},
+                "back in " + (win - since) + " session" + (win-since===1?"":"s")) : null,
+              x.source === "ai" ? h("span",{class:"badge accent"},"Claude") : null) : null),
+          h("button",{class:"small danger",onclick:function(){ askRetire(x); }},"Retire")
         ));
       });
     }
     [q,roleSel,focusSel].forEach(function(el){ el.addEventListener("input",draw); el.addEventListener("change",draw); });
 
-    APP.append(h("div",{class:"card stack"},
-      h("div",{class:"row wrap"},
-        h("h2",{style:{flex:"1"}},"Library"),
-        h("span",{class:"badge"}, data.library.filter(isLive).length + " sets"),
-        h("button",{ class:"primary small", disabled: busy || offline,
-          onclick:function(){ growLibrary(); } }, "Ask Claude for new sets")),
-      h("div",{class:"small muted"},
-        "The generator only uses active sets. Retiring one keeps it in your saved trainings but stops it coming up again.")));
+    APP.append(h("div",{class:"small muted",style:{marginBottom:"14px"}},
+      data.library.filter(isLive).length + " sets. " +
+      "The generator only uses active sets. Retiring one keeps it in your saved trainings but stops it coming up again."));
 
     if (proposed.length){
-      var pbox = h("div",{class:"card stack"},
-        h("div",{class:"row"}, h("h2",{style:{flex:"1"}},"Claude suggests"),
-          h("span",{class:"badge accent"}, proposed.length + " waiting")));
+      var pcard = h("div",{class:"list-card"});
+      APP.append(h("div",{class:"list"},
+        h("div",{class:"list-hdr"},"Claude suggests, " + proposed.length + " waiting"), pcard));
       proposed.forEach(function(x){
-        pbox.append(h("div",{class:"lrow"},
+        pcard.append(h("div",{class:"irow lrow"},
           h("div",{class:"lmain"},
-            h("div",{style:{fontWeight:"600"}}, x.name),
-            h("div",{class:"small muted"}, x.structure + (x.rest ? ", " + x.rest : "")),
-            x.cue ? h("div",{class:"small",style:{color:"var(--accent-text)"}}, x.cue) : null,
-            x.watch_for ? h("div",{class:"tiny muted"}, x.watch_for) : null,
-            h("div",{class:"tiny muted"}, (ROLE_LABEL[x.role]||x.role) + " · " + (x.focus_tags||[]).join(", "))),
-          h("div",{class:"row",style:{gap:"4px"}},
-            h("button",{class:"small good",onclick:function(){ setStatus(x,"active"); }},"Add"),
-            h("button",{class:"small danger",onclick:function(){ setStatus(x,"rejected"); }},"No"))));
+            h("div",{class:"r-1"}, x.name),
+            h("div",{class:"r-2"}, x.structure + (x.rest ? ", " + x.rest : "")),
+            x.cue ? h("div",{class:"r-2",style:{color:"var(--accent-text)"}}, x.cue) : null,
+            x.watch_for ? h("div",{class:"r-3"}, x.watch_for) : null,
+            h("div",{class:"r-3"}, (ROLE_LABEL[x.role]||x.role) + " · " + (x.focus_tags||[]).join(", ")))));
+        // Keep and reject used to sit 4px apart, with no confirmation on either.
+        // Now they are at opposite ends of a full width row.
+        pcard.append(h("div",{class:"irow pact"},
+          h("button",{class:"small good",onclick:function(){ setStatus(x,"active"); }},"Add"),
+          h("button",{class:"small danger",onclick:function(){ setStatus(x,"rejected"); }},"No")));
       });
-      APP.append(pbox);
     }
 
     APP.append(h("div",{class:"filters"}, q, roleSel, focusSel));
     APP.append(box); draw();
   }
-  function toggleActive(x){
-    if (!confirm("Retire \"" + x.name + "\"? It stops coming up in new trainings.")) return;
-    mutate(function(){ return sb.from("tr_exercises").update({ active:false }).eq("id", x.id); });
+  function askRetire(x){
+    openSheet("Retire this set?", "sm", function(body){
+      body.append(
+        h("p",{class:"small muted"}, "“" + x.name + "” stays in your saved trainings. It just stops coming up in new ones."),
+        h("button",{class:"primary big",onclick:function(){
+          closeSheet();
+          mutate(function(){ return sb.from("tr_exercises").update({ active:false }).eq("id", x.id); });
+        }},"Retire it"),
+        h("button",{class:"big",style:{marginTop:"12px"},onclick:closeSheet},"Keep it"));
+    });
+  }
+  // The old button picked the role from thinRoles()[0] and the focus at random
+  // from every focus including the inactive ones, and told him neither.
+  function askClaude(prefRole){
+    var thin = thinRoles();
+    var roleSel = h("select",{"aria-label":"Role"},
+      Object.keys(ROLE_LABEL).filter(function(r){ return r !== "warmup"; })
+        .map(function(r){ return h("option",{value:r}, ROLE_LABEL[r]); }));
+    roleSel.value = prefRole || (thin.length ? thin[0].role : "main_set");
+    var focusSel = h("select",{"aria-label":"Focus"},
+      data.focuses.filter(function(f){ return f.active !== false; })
+        .map(function(f){ return h("option",{value:f.key}, f.name); }));
+    var countSel = h("select",{"aria-label":"How many"}, [3,5,8].map(function(n){
+      return h("option",{value:String(n)}, n + " new sets"); }));
+    countSel.value = "5";
+    openSheet("Ask Claude for new sets", "med", function(body){
+      body.append(
+        list("What to write", listCard(
+          setupRow("Role", roleSel),
+          setupRow("Focus", focusSel),
+          setupRow("How many", countSel)),
+          "Claude writes them, you review them here. Nothing joins the rotation until you say Add."),
+        h("button",{class:"primary big",disabled: busy || offline,onclick:function(){
+          closeSheet();
+          growLibrary(roleSel.value, focusSel.value, parseInt(countSel.value,10) || 5);
+        }},"Ask Claude"),
+        h("button",{class:"big",style:{marginTop:"12px"},onclick:closeSheet},"Not now"));
+    });
   }
   function setStatus(x, status){
     mutate(function(){ return sb.from("tr_exercises").update({ status:status }).eq("id", x.id); });
   }
 
-  async function growLibrary(){
-    var thin = thinRoles();
-    var focus = data.focuses[Math.floor(Math.random()*data.focuses.length)];
-    var role = thin.length ? thin[0].role : "main_set";
+  async function growLibrary(role, focusKey, count){
+    role = role || "main_set";
+    // An inactive focus used to be in the draw, so Claude could be asked to
+    // write sets for a focus the generator will never pick.
+    var focus = data.focuses.filter(function(f){ return f.key === focusKey; })[0] ||
+                data.focuses.filter(function(f){ return f.active !== false; })[0] || null;
+    count = count || 5;
     busy = true; render();
     var res = await callAi("propose_sets", {
       role: role, focus: focus ? { key:focus.key, name:focus.name, what_it_trains:focus.what_it_trains } : null,
-      count: 5,
+      count: count,
       existing: data.library.filter(function(x){ return x.role === role; })
         .map(function(x){ return { name:x.name, structure:x.structure }; }).slice(0,40)
     });
@@ -2166,6 +3093,7 @@
 
   // ------------------------------------------------------------- Insights ---
   function renderInsights(){
+    shell("Insights", true);
     var recent = data.sessions.filter(function(s){ return s.status !== "skipped"; }).slice(0, 24);
     var byFocus = {};
     recent.forEach(function(s){ byFocus[s.focus_key] = (byFocus[s.focus_key]||0)+1; });
@@ -2174,72 +3102,109 @@
     var vols = recent.slice(0,12).reverse();
     var avgVol = vols.length ? Math.round(vols.reduce(function(a,s){ return a + (s.planned_total_m||0); },0)/vols.length) : 0;
     var aiCount = recent.filter(function(s){ return s.engine === "ai"; }).length;
+    var live = data.library.filter(isLive).length;
 
-    APP.append(h("div",{class:"tiles"},
-      tile("Sessions", String(data.sessions.length), "saved in total"),
-      tile("Average", fmtM(avgVol), "last " + vols.length + " sessions"),
-      tile("Written by Claude", aiCount + " of " + recent.length, "the rest came from the library"),
-      tile("Library", String(data.library.filter(isLive).length), "active sets")
-    ));
+    // With nothing saved this screen used to draw zeroes, "last 0 sessions" and
+    // every focus bar at "not yet". Settings stay either way, because that is
+    // where the way out lives.
+    if (!data.sessions.length){
+      APP.append(h("div",{class:"empty"},
+        "Nothing to show yet. Save a couple of trainings and this fills in."));
+    } else {
+      APP.append(h("div",{class:"tiles"},
+        tile("Sessions", String(data.sessions.length), "saved"),
+        tile("Average", fmtM(avgVol), "last " + vols.length),
+        tile("By Claude", aiCount + " of " + recent.length, "rest from the library"),
+        tile("Library", String(live), "active sets")
+      ));
 
-    var fbox = h("div",{class:"card stack"}, h("div",{class:"section-label"},"Focus balance, last " + recent.length + " sessions"));
-    data.focuses.forEach(function(f){
-      var n = byFocus[f.key] || 0;
-      fbox.append(h("div",null,
-        h("div",{class:"row"},
-          h("span",{class:"small",style:{flex:"1"}}, f.name),
-          h("span",{class:"tiny muted"}, n ? n + "x" : "not yet")),
-        h("div",{class:"bar"}, h("i",{style:{width:(n/maxF*100)+"%",opacity: n?1:0.15}}))));
-    });
-    APP.append(fbox);
+      // Thin roles first: it is the only card on this screen he acts on.
+      var thin = thinRoles();
+      if (thin.length){
+        var tcard = h("div",{class:"list-card"});
+        thin.forEach(function(t){
+          tcard.append(irow({ title: ROLE_LABEL[t.role]||t.role,
+            right: h("span",{class:"badge warn"}, t.have + " of " + t.need) }));
+        });
+        tcard.append(irow({ title:"Ask Claude for new sets", act:true, tone:"r-accent",
+          onclick:function(){ askClaude(thin[0].role); } }));
+        APP.append(list("The pool is getting thin", tcard,
+          "These roles have few sets, so the generator has to bring them back sooner."));
+      }
 
-    var thin = thinRoles();
-    if (thin.length){
-      var tb = h("div",{class:"card stack"},
-        h("div",{class:"section-label"},"The pool is getting thin"),
-        h("div",{class:"small muted"},"These roles have few sets, so the generator will start repeating them sooner than six sessions."));
-      thin.forEach(function(t){
-        tb.append(h("div",{class:"row"},
-          h("span",{class:"small",style:{flex:"1"}}, ROLE_LABEL[t.role]||t.role),
-          h("span",{class:"badge warn"}, t.have + " of " + t.need)));
+      var fcard = h("div",{class:"list-card"});
+      data.focuses.forEach(function(f){
+        var n = byFocus[f.key] || 0;
+        fcard.append(h("div",{class:"irow"},
+          h("div",{class:"r-main"},
+            h("div",{class:"r-2"}, f.name),
+            h("div",{class:"bar",style:{marginTop:"6px"}},
+              h("i",{style:{width:(n/maxF*100)+"%",opacity: n?1:0.15}}))),
+          h("div",{class:"r-val"}, n ? n + "x" : "not yet")));
       });
-      tb.append(h("button",{class:"primary small",disabled:offline,onclick:growLibrary},"Ask Claude for new sets"));
-      APP.append(tb);
+      APP.append(list("Focus balance, last " + recent.length + " sessions", fcard));
+
+      // The never-used list was computed and thrown away: only the count showed,
+      // so the one screen that could tell him what to try next did not.
+      var stale = data.library.filter(function(x){ return isLive(x) && !x.last_used_on; });
+      if (stale.length){
+        var scard = h("div",{class:"list-card"});
+        stale.slice(0,12).forEach(function(x){
+          scard.append(irow({ title:x.name,
+            sub:(ROLE_LABEL[x.role]||x.role) + " · " + x.structure }));
+        });
+        APP.append(list("Never used, " + stale.length + " of " + live, scard,
+          stale.length > 12 ? "The first 12 of them." : null));
+      }
+      var over = data.library.filter(function(x){ return (x.times_used||0) >= 4; })
+        .sort(function(a,b){ return (b.times_used||0)-(a.times_used||0); }).slice(0,8);
+      if (over.length){
+        var ocard = h("div",{class:"list-card"});
+        over.forEach(function(x){
+          ocard.append(irow({ title:x.name, val:(x.times_used||0) + "x" }));
+        });
+        APP.append(list("Most used", ocard));
+      }
     }
 
-    var stale = data.library.filter(function(x){ return isLive(x) && !x.last_used_on; });
-    var over = data.library.filter(function(x){ return (x.times_used||0) >= 4; })
-      .sort(function(a,b){ return (b.times_used||0)-(a.times_used||0); }).slice(0,8);
-    APP.append(h("div",{class:"card stack"},
-      h("div",{class:"section-label"},"Sets you have never used"),
-      h("div",{class:"small muted"}, stale.length + " of " +
-        data.library.filter(isLive).length + " have never come up."),
-      over.length ? h("div",{class:"section-label",style:{marginTop:"10px"}},"Most used") : null,
-      over.map(function(x){
-        return h("div",{class:"row"},
-          h("span",{class:"small",style:{flex:"1"}}, x.name),
-          h("span",{class:"badge"}, (x.times_used||0) + "x"));
-      })));
+    APP.append(list("Pace", h("div",{class:"list-card"},
+        settingRow("Steady pace, seconds per 100 m (includes rest and you talking)","pace_steady_s_per_100"),
+        settingRow("Faster pace, seconds per 100 m","pace_strong_s_per_100")),
+      "Change the two pace numbers after a couple of real sessions. They are what makes the clock come out right."));
 
-    APP.append(h("div",{class:"card stack"},
-      h("div",{class:"section-label"},"Settings"),
-      settingRow("Steady pace, seconds per 100 m (includes rest and you talking)","pace_steady_s_per_100"),
-      settingRow("Faster pace, seconds per 100 m","pace_strong_s_per_100"),
+    APP.append(list("Generator", h("div",{class:"list-card"},
       settingRow("Main block, least metres","main_min_m"),
       settingRow("Main block, most metres","main_max_m"),
-      settingRow("Sessions before a set can come back","no_repeat_sessions"),
-      h("div",{class:"tiny muted"},"Change the two pace numbers after a couple of real sessions. They are what makes the clock come out right.")));
+      settingRow("Sessions before a set can come back","no_repeat_sessions"))));
+
+    APP.append(list("Pool view", h("div",{class:"list-card"},
+        switchRow("Bigger text", ui.poolBig, function(){ ui.poolBig = !ui.poolBig; saveUi(); render(); }),
+        switchRow("Night pool", ui.poolNight, function(){ ui.poolNight = !ui.poolNight; saveUi(); render(); })),
+      "The deck stays black on white by default. A large light field is easier to read at arm's length in a bright hall, and a droplet on a dark screen scatters as a bright point."));
+
+    APP.append(list("Display", h("div",{class:"list-card"},
+        switchRow("Solid backgrounds", ui.solid, function(){ ui.solid = !ui.solid; saveUi(); render(); })),
+      "Turns off the blur behind the top bar and the tab bar."));
+
+    APP.append(list("Account", h("div",{class:"list-card"},
+      h("div",{class:"irow"},
+        h("div",{class:"r-main"},
+          h("div",{class:"r-1"}, coachRow ? coachRow.display_name : (session ? session.user.email : "")),
+          session ? h("div",{class:"r-3"}, session.user.email) : null)),
+      irow({ title:"Log out", act:true, tone:"r-danger", onclick:signOut }))));
   }
   function settingRow(label, key){
     var S = data.settings || defaultSettings();
-    var inp = h("input",{ class:"small", type:"number", value:String(S[key]), style:{width:"90px"} });
+    var inp = h("input",{ class:"small", type:"number", inputmode:"numeric",
+      "aria-label":label, value:String(S[key]), style:{width:"92px",textAlign:"right"} });
     inp.addEventListener("change", function(){
       var v = parseInt(inp.value,10);
       if (!isFinite(v)) return;
       var patch = {}; patch[key] = v;
       mutate(function(){ return sb.from("tr_settings").update(patch).eq("id",1); });
     });
-    return h("div",{class:"row"}, h("span",{class:"small",style:{flex:"1"}}, label), inp);
+    return h("div",{class:"irow"},
+      h("div",{class:"r-main"}, h("div",{class:"r-2"}, label)), inp);
   }
 
   // ==========================================================================
@@ -2262,12 +3227,15 @@
       }
     });
 
-    if (!session){ render(); return; }
-    try{ await loadAll(); afterLoad(); }
-    catch(e){ console.warn(e); afterLoadFailed(e); }
+    // These three used to sit after the early return, so a coach who signed in
+    // from the login screen got no focus, online or offline handling at all
+    // until the next cold start.
     window.addEventListener("focus", refresh);
     window.addEventListener("online", function(){ refresh(); });
     window.addEventListener("offline", function(){ offline = true; render(); });
+    if (!session){ render(); return; }
+    try{ await loadAll(); afterLoad(); }
+    catch(e){ console.warn(e); afterLoadFailed(e); }
   }
   function afterLoad(){
     coachRow = (data.coaches||[]).filter(function(c){ return c.id === session.user.id; })[0] || null;
