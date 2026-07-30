@@ -280,6 +280,10 @@
     flex:none;
   }
   .barbtn:active{ background:var(--fill-3); }
+  /* The chevron is part of the label text, so it can never drift out of sync with
+     it. Tighter left padding pulls it toward the edge the way iOS does, and the
+     name is allowed to shrink before the row does. */
+  .barbtn.back{ padding-left:var(--s-1); white-space:nowrap; }
 
   .tabbar{
     position:fixed; left:0; right:0; bottom:0; z-index:var(--z-tabbar);
@@ -1009,9 +1013,12 @@
   var barAct = { left:null, right:null };
   function barButton(el, spec){
     if (!spec){ el.className = "barbtn gone"; el.textContent = ""; return null; }
-    el.className = "barbtn";
-    el.textContent = spec.label;
-    el.setAttribute("aria-label", spec.label);
+    // A back button carries a chevron and names where it goes, the way iOS does,
+    // so a pushed screen never looks like a tab you landed on by accident. The
+    // spoken label says "Back to History" while the visible one stays short.
+    el.className = "barbtn" + (spec.back ? " back" : "");
+    el.textContent = (spec.back ? "‹ " : "") + spec.label;
+    el.setAttribute("aria-label", spec.back ? "Back to " + spec.label : spec.label);
     return spec.onclick;
   }
   function setBar(title, left, right){
@@ -1043,9 +1050,12 @@
   function paintTabs(){
     TABBTN.forEach(function(btn, i){
       if (!btn) return;
-      // Pool view is a modal task, not a tab, so it leaves Today lit.
+      // Pool view is a modal task, not a tab, so it leaves Today lit. A session
+      // opened from History is pushed inside that tab, so it leaves History lit:
+      // the tab bar says where you are, and you are still in your history.
       var on = view.name === TABS[i][0] ||
-               (view.name === "pool" && TABS[i][0] === "today");
+               (view.name === "pool" && TABS[i][0] === "today") ||
+               (view.name === "session" && TABS[i][0] === "history");
       btn.className = "tab" + (on ? " on" : "");
       btn.setAttribute("aria-current", on ? "page" : "false");
     });
@@ -1217,7 +1227,7 @@
   var offline = false, staleMirror = false;
   var poolState = null;           // { startedAt, timer }
   var lib = { q:"", role:"", focus:"", showProposed:false };
-  var hist = { q:"" };            // the History term, so a repaint cannot lose it
+  var hist = { q:"", scrollY:0 };  // the History term and where he was in the list
 
   var MIRROR_KEY = "wstrain.mirror.v1";
 
@@ -2461,6 +2471,7 @@
                   : "No connection. Working from the copy saved on this phone. Nothing will be saved until you are back online."));
 
     if (view.name === "history")  return renderHistory();
+    if (view.name === "session")  return renderSessionDetail();
     if (view.name === "library")  return renderLibrary();
     if (view.name === "insights") return renderInsights();
     return renderToday();
@@ -2553,6 +2564,26 @@
       h("div",{class:"r-main"}, h("div",{class:"r-1"}, label)), ctl);
   }
 
+  // A saved session opened from History. Pushed inside the History tab, so the
+  // tab bar keeps History lit and the top left button goes back rather than the
+  // screen pretending to be Today. No Set up and no Generate: this session
+  // already happened, and everything you can still do to it (mark it done, rate
+  // it, regenerate it, copy it, print it, run it in Pool view) lives on the card.
+  function renderSessionDetail(){
+    var sk = view.pastSession;
+    if (!sk){ view.name = "history"; return renderHistory(); }
+    shell(fmtDayDate(sk.date), true,
+      { label:"History", back:true, onclick:function(){ backToHistory(); } },
+      { label:"Pool", onclick:function(){ startPool(sk); } });
+    renderSessionCard(sk, true);
+  }
+  function backToHistory(){
+    view.pastSession = null;
+    view.name = "history";
+    render();
+    window.scrollTo(0, hist.scrollY || 0);
+  }
+
   function renderSessionCard(sk, editable){
     // Three kinds of message used to share one amber banner and could stack five
     // deep, pushing the session off the first screen. Only the safety warnings
@@ -2581,7 +2612,9 @@
         sk.status === "skipped" ? h("span",{class:"badge warn"},"did not run") : null),
       h("div",{class:"small muted",style:{margin:"2px 0 12px"}}, statusLine),
       h("div",{class:"goalbox"},
-        h("div",{class:"lbl"},"Today's goal"),
+        // "Today's goal" is wrong on a session opened from History, which can be
+        // months old. The card is used for both, so the label follows the date.
+        h("div",{class:"lbl"}, sk.date === todayISO() ? "Today's goal" : "The goal"),
         h("div",{class:"txt"}, sk.goal)),
       h("button",{class:"primary big",onclick:function(){ startPool(sk); }},"Start pool view")
     ));
@@ -3000,7 +3033,15 @@
         }
         var coach = (data.coaches||[]).filter(function(c){ return c.id === s.coach_id; })[0];
         card.append(h("button",{ class:"irow tap hrow", onclick:function(){
-            draft = hydrate(s); view.name = "today"; render(); window.scrollTo(0,0);
+            // A past session opens as its own screen, pushed inside the History
+            // tab. It used to assign the today draft and switch to the Today
+            // view, which lit the wrong tab, offered Set up and Generate another
+            // above a session from November, left no way back, and quietly threw
+            // away whatever had been generated for today and not yet saved.
+            hist.scrollY = window.pageYOffset || 0;   // so Back lands where he left
+            view.pastSession = hydrate(s);
+            view.name = "session";
+            render(); window.scrollTo(0,0);
           } },
           h("div",{class:"hdate"}, fmtDate(s.session_date)),
           h("div",{class:"hmain"},
@@ -3442,6 +3483,10 @@
       if ("generating" in u)  generating  = !!u.generating;
       if ("draft" in u)       draft       = u.draft;
       if ("view" in u)        view.name   = u.view;
+      // The saved session opened from History. Named apart from "session" above,
+      // which is the auth session, so the paint checks can drive the pushed
+      // detail screen without touching who is logged in.
+      if ("pastSession" in u) view.pastSession = u.pastSession;
     }
   };
 
