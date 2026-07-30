@@ -1211,6 +1211,39 @@ function paintSweep(env){
        /How hard was it/.test(t),
        rate.map(b => label(b) + ":" + b.className).join(" "));
 
+  // ---- a session opened from History -------------------------------------
+  // Pushed inside the History tab rather than rendered as Today. It used to
+  // assign the today draft and switch to the Today view, which lit the wrong
+  // tab, offered Set up and Generate above a months-old session, gave no way
+  // back, and threw away an unsaved draft for today.
+  E.setUi({ draft: null, view: "session", pastSession: saved });
+  E.render();
+  t = shot("a session opened from History", APP, 40, 500);
+  const detailActs = byTag(APP, "button").map(label);
+  want("the pushed session screen carries no Set up form and no Generate",
+       detailActs.every(a => !/^Generate/.test(a)) && !/Set up/.test(t),
+       detailActs.join(" | ").slice(0, 120));
+  want("the pushed session screen offers a back button naming History",
+       label(doc.getElementById("bar-left")).indexOf("History") !== -1,
+       label(doc.getElementById("bar-left")));
+  want("the pushed session screen keeps History lit, not Today",
+       classesOf(doc.getElementById("tab-history")).indexOf("on") !== -1 &&
+       classesOf(doc.getElementById("tab-today")).indexOf("on") === -1,
+       "history:" + doc.getElementById("tab-history").className +
+       "  today:" + doc.getElementById("tab-today").className);
+  want("a months-old session does not call its goal today's",
+       !/Today.s goal/i.test(t), (t.match(/.{0,18}goal/i) || [""])[0]);
+  // The other half of the same condition, or an inverted test passes on both.
+  const stubToday = new Date(BASE_NOW).toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  const asToday = Object.assign({}, saved, { date: stubToday });
+  E.setUi({ draft: null, view: "session", pastSession: asToday });
+  E.render();
+  const tToday = textOf(APP);
+  want("a session dated today does call its goal today's",
+       /Today.s goal/i.test(tToday), (tToday.match(/.{0,18}goal/i) || [""])[0]);
+  E.setUi({ pastSession: saved });
+  E.render();
+
   // ---- the pool view -----------------------------------------------------
   // The one screen read at arm's length with wet hands, and the one pass 2
   // rebuilds from scratch.
