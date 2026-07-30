@@ -5,9 +5,9 @@ user-facing guide; this file is the build state.
 
 ## START HERE: the redesign is done and shipped
 
-The iOS redesign is live at cache `ws-training-v6`, blockers, majors and minors all done. `node verify.js` passes 128
+The iOS redesign is live at cache `ws-training-v7`, blockers, majors and minors all done. `node verify.js` passes 128
 checks, and `SEEDS=1-20 node verify.js` passes 4,000 simulated sessions. All six
-screens have been rendered and looked at.
+screens have been rendered and looked at, plus the pushed session screen.
 
 What the app has now: a bottom tab bar in thumb reach, large scrolling titles,
 grouped inset lists, sheets for editing, full dark mode from
@@ -191,46 +191,47 @@ already live defects, and the triage found 5 more plus 3 hazards the review neve
 contained. Also, the line further down this file that says "None of these are
 fixed" is no longer true: 2 are fully fixed and 5 are half fixed.
 
-## The redesign is half done, and the half that is left is specified
+## The design documents in `design/`, and what they are worth now
 
-A full iOS restructure was designed and reviewed. **Pass 1 is live.** Pass 2 is
-not started, and everything it needs is written down in `design/`:
+Both passes shipped. These are kept for the reasoning, not as a to-do list:
 
-- `design/DESIGN-SPEC.md` is the full specification: token groups, the two
-  visual registers, type scale, per screen layout, components, motion, and a
-  DO NOT TOUCH list. Every colour in it was measured, not guessed.
-- `design/DESIGN-REVIEW.md` is 7 blockers, 24 majors and 16 minors found by
-  three independent reviewers on the draft implementation, each with a fix, plus
-  the 14 risk decisions the spec carries. **None of these are fixed.** Read it
-  before writing a line of pass 2.
-- `design/draft-stylesheet.css` and `design/draft-markup-edits.json` are that
-  reviewed-but-unapplied draft. Do not paste them in. They are written for
-  markup that does not exist yet and they contain every one of those blockers.
+- `design/DESIGN-SPEC.md` is the full specification: token groups, the two visual
+  registers, type scale, per screen layout, components, motion. Still the best
+  explanation of *why* the app looks the way it does. A few of its measurements
+  were later shown wrong by rendering the page, so trust the file over the spec.
+- `design/DESIGN-REVIEW.md` is 7 blockers, 24 majors and 16 minors from three
+  reviewers on the draft implementation. All the real ones are fixed. Several of
+  its contrast ratios are wrong, including one whose prescribed fix measured
+  2.08:1 against what actually shipped, so recompute before believing a number.
+- `design/draft-stylesheet.css` and `design/draft-markup-edits.json` are the
+  reviewed-but-unapplied draft. **Never paste them in.** They target markup that
+  no longer exists and carry every one of those blockers.
 
-**Pass 1, live now:** the token system with light and dark palettes, dark mode
-from `prefers-color-scheme`, `prefers-contrast` and
-`prefers-reduced-transparency` in separate blocks, every tap target at 44px or
-more, `:active` feedback with hover behind `@media (hover:hover)`, and four real
-bugs fixed. It was written fresh against the existing markup rather than taken
-from the draft, which is why none of the blockers reached the app.
+**The legibility gap that used to be open is closed.** The pool set line was
+24.8px at 375px, under the 16 arcmin floor. The call and qualifier are now split,
+so the line he shouts is its own element at 34px and the rest reads underneath.
 
-The four bugs: primary buttons failed AA at 4.10:1 and are now 7.56:1; retired
-library sets were counted and listed as active in five places and now go through
-one `isLive()` predicate; the pool done state was 2.34:1 and colour-only, and is
-now 17.68:1 with a "done" marker; and the difficulty rating claimed to change the
-next session's volume, which no code ever did.
+## History sessions open as their own screen
 
-**Pass 2, not started:** bottom tab bar, large titles, grouped inset lists,
-sheets, and the Pool view rebuild with the tick strip.
+Added 30 July 2026, after Vlad reported that tapping a past session "opens like in
+the main today training page".
 
-### The one legibility gap still open
+`view.name === "session"` renders `renderSessionDetail()`, pushed inside the
+History tab: a `‹ History` back button on the left, the session's own date as the
+title, `paintTabs()` keeps History lit the same way pool keeps Today lit, and
+`hist.scrollY` is captured on the way in so Back lands where he left the list.
+No Set up form and no Generate button, because the session already happened.
 
-At 375px the pool set line renders at 24.8px, under the ISO 9241 16 arcmin floor
-that `DESIGN-SPEC.md` derives for a bright hall at 70 cm. It was left alone on
-purpose: raising the size without the call/rest/qualifier split makes a 53
-character set line wrap to four lines, which is worse than small type. The split
-is specified in the spec, section 6. This is unchanged from the original app, so
-it is a gap and not a regression.
+The handler used to be `draft = hydrate(s); view.name = "today"`. Besides lighting
+the wrong tab and offering no way back, that **assigned the today draft**, so
+opening a past session silently destroyed a training generated for today and not
+yet saved. The detail view holds its own `view.pastSession` instead. That property
+is deliberately not called `session`: in this file `session` is the auth session.
+
+Five paint checks cover the screen, and `setUi` accepts `pastSession` so the
+harness can drive it. The goal box label follows the date rather than always
+saying "Today's goal", and both halves of that condition are tested, because a
+test for one half passes even when the condition is inverted.
 
 ## It is live and working
 
