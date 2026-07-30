@@ -416,9 +416,12 @@ the old copy. Currently at `ws-training-v1`.
 - Sessions are recorded per group and coach, not per swimmer. Per-swimmer
   tracking is the Swimmers Progress app's job.
 
-## Open question worth asking him
+## No open questions
 
-His sprint pyramid note reads `25 sprint / 50m 90% / 100m 80% / 200m 70% / Rest
-1 min, 3 more times`. I read "3 more times" as **four rounds total** (1,500 m).
-If he meant three rounds after the first, that set should be 1,875 m. Worth
-confirming when he next reviews the library.
+The sprint pyramid is settled. Vlad confirmed on 30 July 2026 that
+`25 sprint / 50m 90% / 100m 80% / 200m 70% / Rest 1 min, 3 more times` means
+**four rounds total, 1,500 m**, which is what the library already stored:
+`reps` 4, `rep_distance_m` 375, `distance_m` 1500. No change was needed. His
+verbatim "3 more times" wording stays in `tr_historical_trainings` on purpose,
+because that table is the style reference Claude reads, not a set the generator
+picks from.
